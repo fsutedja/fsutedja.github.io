@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Freya Sutedja</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,300..700,0..100,0..1&family=Young+Serif&family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,300..700&family=Rubik:wght@400;500&family=Caveat:wght@400;600&family=IBM+Plex+Mono&display=swap" rel="stylesheet">
+<link href="https://api.fontshare.com/v2/css?f[]=chillax@400,500&display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #f1eeea; --paper: #f8f6f2; --ink: #3a3433; --soft: #6b615e; --muted: #9a908c; --rose: #b0707c; --line: #ddd5cc;
+          --display: "Fraunces", serif; --text: "Fraunces", serif; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--text); overflow: hidden; }
+  a { color: inherit; }
+  .mono { font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: .07em; text-transform: uppercase; }
+
+  /* the field the gems lie on. Its background is what the gems' "multiply" blends with,
+     so the white around each cut-out gem disappears into the page. */
+  .field { position: fixed; inset: 0; overflow: hidden; transition: opacity .6s, filter .6s;
+           background-color: var(--bg);
+           /* one even paper colour (no light-to-dark gradient) */ }
+  /* paper: the "tooth" is noise lit from the top-left (tiny bumps catch the light), plus faint fibres */
+  .paper { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: overlay; opacity: var(--paper, .35); /* overlay: bumps lighten AND darken, so the paper keeps its colour */
+           background-image:
+             url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='900' height='900'><filter id='p' x='0' y='0' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='.05' numOctaves='5' seed='4' stitchTiles='stitch' result='n'/><feDiffuseLighting in='n' lighting-color='%23fffdf9' surfaceScale='4.6' diffuseConstant='1.0'><feDistantLight azimuth='225' elevation='38'/></feDiffuseLighting></filter><rect width='100%' height='100%' filter='url(%23p)'/></svg>"),
+             url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='500' height='500'><filter id='q' x='0' y='0' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='.22' numOctaves='3' seed='11' stitchTiles='stitch' result='n'/><feDiffuseLighting in='n' lighting-color='%23ffffff' surfaceScale='1.5' diffuseConstant='1.12'><feDistantLight azimuth='225' elevation='48'/></feDiffuseLighting></filter><rect width='100%' height='100%' filter='url(%23q)'/></svg>"),
+             url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><filter id='f'><feTurbulence type='fractalNoise' baseFrequency='.018 .1' numOctaves='2' seed='8' stitchTiles='stitch'/><feColorMatrix values='.06 0 0 0 .955  .06 0 0 0 .952  .06 0 0 0 .948  0 0 0 0 1'/></filter><rect width='100%' height='100%' filter='url(%23f)'/></svg>");
+           background-blend-mode: multiply; }
+  body.open .field { opacity: .3; filter: blur(2px); }
+  .gem { position: absolute; transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, 0px))) rotate(calc(var(--rot, 0rad) + var(--sway, 0deg))) scale(var(--s, 1)); background-size: 100% 100%;
+         mix-blend-mode: multiply; filter: hue-rotate(var(--hue, 0deg)) saturate(var(--sat, 1)) brightness(var(--b, 1)); }
+  /* moving light, clipped to the gem's own shape */
+  .gem .light, .gem .shade { position: absolute; inset: 0; -webkit-mask-size: 100% 100%; mask-size: 100% 100%; pointer-events: none; }
+  .gem .light { mix-blend-mode: screen; opacity: var(--k, .5);
+    background: radial-gradient(circle at var(--lx, 35%) var(--ly, 30%), rgba(255,255,255,.85) 0%, rgba(255,250,252,.45) 16%, rgba(255,240,248,.15) 30%, rgba(255,255,255,0) 46%); }
+  .gem .shade { mix-blend-mode: soft-light; opacity: var(--k, .5);
+    background: linear-gradient(var(--ldeg, 315deg), rgba(40,25,50,.55) 0%, rgba(128,128,128,0) 50%, rgba(255,255,255,.85) 100%); }
+  /* the shine near the cursor: a soft prism-tinted glow with faint fading rays, easing in and out */
+  .glint { position: absolute; width: 64px; height: 64px; pointer-events: none; opacity: var(--go, 0);
+           transform: translate(-50%, -50%) scale(var(--g, .6)); mix-blend-mode: screen;
+           background: radial-gradient(circle, rgba(255,255,255,.8) 0%, rgba(255,247,250,.45) 14%, rgba(255,228,240,.2) 30%, rgba(214,236,255,.1) 44%, rgba(255,255,255,0) 64%); }
+  .glint::before, .glint::after { content: ""; position: absolute; left: 50%; top: 50%; height: 1.5px; border-radius: 2px; filter: blur(.7px);
+           background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.75) 50%, rgba(255,255,255,0)); }
+  .glint::before { width: 100%; transform: translate(-50%, -50%) rotate(var(--r, 0deg)); }
+  .glint::after { width: 62%; transform: translate(-50%, -50%) rotate(calc(var(--r, 0deg) + 90deg)); }
+
+  header { position: fixed; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; padding: 22px 4vw; color: var(--muted); z-index: 5; pointer-events: none; }
+  .hello { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(var(--fit, 1)); width: 760px; text-align: center; z-index: 3; transition: opacity .5s; }
+  body.open .hello { opacity: 0; pointer-events: none; }
+  .hello h1 { font-family: var(--display); font-weight: 400; font-size: 104px; line-height: 1; letter-spacing: -0.02em; white-space: nowrap; }
+  .hello .tag { margin-top: 14px; color: var(--soft); text-transform: none; font-size: 13px; letter-spacing: .06em; }
+  .hello .links { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
+  .hello .links { margin-top: 18px; }
+  .hello .links a { text-decoration: none; border-bottom: 1px solid var(--line); padding-bottom: 2px; }
+  .hello .links a:hover { color: var(--rose); border-color: var(--rose); }
+  .label { position: fixed; z-index: 6; transform: translate(-50%, -100%); font-family: Caveat; font-size: 24px; color: var(--ink); white-space: nowrap;
+           background: rgba(248,246,242,.92); padding: 0 9px; pointer-events: none; opacity: 0; transition: opacity .25s; }
+  .label.on { opacity: 1; }
+
+  .panel { position: fixed; right: 0; top: 0; bottom: 0; width: min(620px, 100%); background: var(--paper); z-index: 20; padding: 70px 52px 50px; overflow-y: auto;
+           transform: translateX(100%); transition: transform .7s cubic-bezier(.6,0,.2,1); box-shadow: -20px 0 50px rgba(60,50,50,.08); }
+  body.open .panel { transform: none; }
+  .panel .back { position: absolute; top: 24px; left: 52px; background: none; border: none; cursor: pointer; color: var(--muted); }
+  .panel .back:hover { color: var(--rose); }
+  .panel h2 { font-family: var(--display); font-weight: 400; font-size: 50px; line-height: 1; letter-spacing: -0.02em; }
+  .panel h2 + .mono { color: var(--muted); margin-top: 10px; }
+  .panel .item { border-top: 1px solid var(--line); padding: 16px 0; }
+  .panel .item:first-of-type { margin-top: 24px; }
+  .panel .item small { color: var(--rose); }
+  .panel .item h3 { font-family: var(--display); font-weight: 400; font-size: 26px; margin-top: 4px; }
+  .panel .item p { color: var(--soft); font-size: 17px; line-height: 1.4; margin-top: 4px; }
+  .panel .links { display: flex; gap: 16px; margin-top: 8px; }
+  .map { position: relative; margin-top: 24px; } .map img { width: 100%; display: block; }
+  .pin { position: absolute; width: 10px; height: 10px; transform: translate(-50%,-50%); border-radius: 50%; background: var(--rose); box-shadow: 0 0 0 2px var(--paper); }
+  .stats { display: flex; gap: 50px; margin-top: 22px; } .stats b { display: block; font-family: var(--display); font-weight: 400; font-size: 44px; line-height: 1; } .stats .mono { color: var(--muted); }
+  .big-links { display: flex; flex-direction: column; gap: 6px; margin-top: 28px; } .big-links a { font-family: var(--display); font-size: 32px; text-decoration: none; } .big-links a:hover { color: var(--rose); }
+
+  body.f-a .hello h1, body.f-a .panel h2 { font-variation-settings: "SOFT" 100, "WONK" 1; font-weight: 450; }
+  body.f-b { --display: "Young Serif", serif; }
+  body.f-c { --display: "Bricolage Grotesque", sans-serif; --text: "Bricolage Grotesque", sans-serif; }
+  body.f-c .hello h1 { font-weight: 500; letter-spacing: -0.04em; }
+  body.f-d { --display: "Rubik", sans-serif; --text: "Rubik", sans-serif; }
+  body.f-d .hello h1 { letter-spacing: -0.04em; }
+  body.f-e { --display: "Chillax", sans-serif; --text: "Chillax", sans-serif; }
+  body.f-e .hello h1 { font-weight: 500; letter-spacing: -0.03em; }
+  .fonts { position: fixed; right: 14px; bottom: 14px; z-index: 50; display: flex; gap: 4px; background: var(--ink); padding: 6px; }
+  .fonts button { background: none; border: 1px solid transparent; color: var(--paper); padding: 6px 10px; cursor: pointer; font-family: "IBM Plex Mono"; font-size: 11px; }
+  .fonts button.on { border-color: var(--paper); }
+  .flag { position: fixed; left: 14px; bottom: 14px; z-index: 50; background: var(--ink); color: var(--paper); padding: 8px 12px; }
+
+  /* tuning panel (for playing with the look) */
+  .tuner-toggle { position: fixed; left: 14px; bottom: 14px; z-index: 60; font: 11px "IBM Plex Mono", monospace; letter-spacing: .05em;
+                  background: rgba(248,246,242,.85); border: 1px solid #cfc6bd; border-radius: 999px; padding: 6px 12px; cursor: pointer; color: #3a3433; }
+  .tuner { position: fixed; left: 14px; bottom: 52px; z-index: 60; width: 290px; padding: 14px 16px 12px; display: none;
+           background: rgba(248,246,242,.94); border: 1px solid #ddd5cc; box-shadow: 0 10px 30px rgba(60,50,50,.08);
+           font: 11px "IBM Plex Mono", monospace; color: #3a3433; }
+  .tuner.open { display: block; }
+  .tuner label { display: grid; grid-template-columns: 1fr 42px; gap: 2px 8px; margin-bottom: 8px; }
+  .tuner label span:last-child { text-align: right; color: #9a908c; }
+  .tuner input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: #b0707c; }
+  .tuner .row { display: flex; gap: 8px; margin-top: 6px; }
+  .tuner button { flex: 1; font: inherit; background: none; border: 1px solid #cfc6bd; border-radius: 999px; padding: 5px 0; cursor: pointer; color: inherit; }
+  .tuner button:hover { background: #fff; }
+  /* design tools: hidden on the public page; open the site with ?tune to show them */
+  body:not(.tune) .tuner-toggle, body:not(.tune) .tuner, body:not(.tune) .fonts { display: none !important; }
+</style>
+
+</head>
+<body>
+<div class="field" id="field"></div>
+<header class="mono"><span>freya sutedja</span><span>berkeley, ca · <span id="clock"></span></span></header>
+
+<div class="hello" id="hello">
+  <h1 id="greeting"></h1>
+  <p class="mono tag" id="tagline"></p>
+  <nav class="links mono" id="links"></nav>
+</div>
+<div class="label" id="label"></div>
+
+<aside class="panel" id="panel">
+  <button class="back mono" id="back">← back</button>
+  <div id="panel-body"></div>
+</aside>
+
+<button class="tuner-toggle" id="tuner-toggle">tune the gems</button>
+<div class="tuner" id="tuner"></div>
+<div class="fonts" id="fonts">
+  <button data-f="f-a">A · Fraunces soft</button>
+  <button data-f="f-b">B · Young Serif</button>
+  <button data-f="f-c">C · Bricolage</button>
+  <button data-f="f-d">D · Rubik</button>
+  <button data-f="f-e">E · Chillax</button>
+</div>
+
+<script>if (new URLSearchParams(location.search).has("tune")) document.body.classList.add("tune");</script>
+<script src="js/content.js"></script>
+<script>window.GEM_SHEET = "images/gem-sheet.png";</script>
+<script src="js/gems.js"></script>
+<script src="js/facets.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const linkList = links => links.map(l => l.url.startsWith("mailto:") ? `<a href="${l.url}">${l.label}</a>` : `<a href="${l.url}" target="_blank" rel="noopener">${l.label}</a>`).join("");
+$("#greeting").textContent = intro.greeting;
+$("#tagline").textContent = intro.tagline;
+$("#links").innerHTML = linkList(intro.links);
+
+const sections = [
+  { name: "projects", gem: "oval", angle: -158, render: () => `<h2>projects</h2><div class="mono">${projects.length} so far</div>${projects.map(p => `<div class="item"><small class="mono">${p.status}</small><h3>${p.title}</h3><p>${p.what}</p>${p.links ? `<nav class="links mono">${linkList(p.links)}</nav>` : ""}</div>`).join("")}` },
+  { name: "toolkit", gem: "aqua2", angle: -28, render: () => `<h2>toolkit</h2><div class="mono">what I can do</div><div class="item"><small class="mono">i can</small><p>${skills.canDo.join(" · ")}</p></div><div class="item"><small class="mono">learning now</small><p>${skills.learning.join(" · ")}</p></div><div class="item"><small class="mono">taught myself</small><p>${skills.taughtMyself.join(" · ")}</p></div>` },
+  { name: "places i've visited", gem: "abStar1", angle: 24, render: () => { const c = new Set(places.map(p => p.country)).size, k = new Set(places.map(p => p.continent)).size; return `<h2>places i've visited</h2><div class="mono">a dot for everywhere I've been</div><div class="map"><img src="images/world.svg" alt="">${places.map(p => `<span class="pin" title="${p.city}" style="left:${(p.lon + 180) / 360 * 100}%;top:${(84 - p.lat) / 142 * 100}%"></span>`).join("")}</div><div class="stats"><div><b>${c}</b><span class="mono">countries</span></div><div><b>${k}</b><span class="mono">continents</span></div></div>${places.map(p => `<div class="item"><h3>${p.city}</h3><p>${p.country} · ${p.note}</p></div>`).join("")}`; } },
+  { name: "life", gem: "pearlBig1", angle: 160, render: () => `<h2>life</h2><div class="mono">outside the notebooks</div><div class="item"><small class="mono">on my walks</small><h3>${life.walks.song}</h3><p>${life.walks.artist}</p></div><div class="item"><small class="mono">reading now</small><h3>${life.reading.book}</h3><p>${life.reading.author}</p></div>` },
+  { name: "say hi", gem: "flower", angle: 96, render: () => `<h2>say hi</h2><div class="mono">open to data / ml / ai roles</div><div class="big-links">${linkList(intro.links)}</div>` },
+];
+
+const field = $("#field");
+let sprites = null, gems = [], fit = 1;
+
+// one canvas holds all the gems; it multiplies onto the page so white disappears
+const canvas = document.createElement("canvas");
+canvas.style.cssText = "position:absolute; inset:0;";
+const renderer = makeFacetRenderer(canvas);
+
+function build() {
+  if (!sprites) return;
+  const W = innerWidth, H = innerHeight;
+  fit = Math.min(1, W / 1060, H / 640);
+  $("#hello").style.setProperty("--fit", fit);
+  field.innerHTML = '<div class="paper"></div>'; field.appendChild(canvas); renderer.resize(W, H);
+  gems = layoutGems(W, H, fit, sections).map((g) => {
+    const sp = sprites[g.name], size = sp.half * 2 * (g.r / sp.r);
+    return { ...g, sp, size, tw: 0, phase: Math.random() * 6, ox: 0, oy: 0, amp: (3 + Math.random() * 5) * fit, speed: .25 + Math.random() * .35 };
+  });
+}
+makeFacetSprites().then((s) => { sprites = s; build(); });
+let resizeTimer; addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(build, 150); });
+
+/* motion + living light */
+let mouse = null;
+// for testing screenshots: ?mx=..&my=.. places a pretend cursor
+const q = new URLSearchParams(location.search); if (q.has("mx")) mouse = { x: +q.get("mx"), y: +q.get("my") };
+addEventListener("pointermove", (e) => (mouse = { x: e.clientX, y: e.clientY }));
+document.addEventListener("pointerleave", () => (mouse = null));
+
+let view = { x: 0, y: 0 };
+function frame(ms) {
+  const t = ms / 1000, items = [];
+  // your viewpoint: the cursor across the page = the angle you look at the gems from (eased, so it feels like moving your head)
+  const want = mouse ? { x: (mouse.x / innerWidth - .5) * 2, y: (mouse.y / innerHeight - .5) * 2 } : { x: Math.sin(t * .17) * .5, y: Math.cos(t * .13) * .4 };
+  view.x += (want.x - view.x) * .06; view.y += (want.y - view.y) * .06;
+  // the light: your cursor; when it's away, a light slowly drifts around above the page
+  const light = mouse || { x: innerWidth * (.5 + .42 * Math.cos(t * .23)), y: innerHeight * (.45 + .4 * Math.sin(t * .31)) };
+  gems.forEach((g) => {
+    // gentle drift, and sliding softly out of the cursor's way
+    let tx = Math.sin(t * g.speed + g.phase) * g.amp, ty = Math.cos(t * g.speed * .8 + g.phase * 1.7) * g.amp;
+    if (mouse) {
+      const mx = g.x - mouse.x, my = g.y - mouse.y, md = Math.hypot(mx, my), reach = 130;
+      if (md < reach && md > 0.1) { const push = (1 - md / reach) ** 2 * 26; tx += mx / md * push; ty += my / md * push; }
+    }
+    g.ox += (tx - g.ox) * .08; g.oy += (ty - g.oy) * .08;
+    // a little depth: as your viewpoint moves, bigger (closer) gems shift slightly more
+    const depth = 1.5 + g.r * .12;
+    const gx = g.x + g.ox - view.x * depth, gy = g.y + g.oy - view.y * depth;
+    const rot = g.rot + Math.sin(t * g.speed * .7 + g.phase * 2) * 4 * Math.PI / 180;
+    const d = Math.hypot(light.x - gx, light.y - gy);
+    const near = Math.max(0, 1 - d / 420);                          // how strongly this gem is lit
+    items.push({ sprite: g.sp, x: gx, y: gy, size: g.size, rot, light, near });
+
+  });
+  renderer.draw(items, t, view);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+function openSection(i) { $("#panel-body").innerHTML = sections[i].render(); document.body.classList.add("open"); }
+$("#back").onclick = () => document.body.classList.remove("open");
+addEventListener("keydown", e => e.key === "Escape" && document.body.classList.remove("open"));
+
+
+/* tuning panel: sliders for every look setting; changes show instantly and are remembered */
+const tuner = $("#tuner");
+if (localStorage.getItem("freya-paper-v") !== "3") { localStorage.removeItem("freya-paper"); localStorage.setItem("freya-paper-v", "3"); }
+let paperStrength = +(localStorage.getItem("freya-paper") ?? 0.35);
+document.documentElement.style.setProperty("--paper", paperStrength);
+function drawTuner() {
+  tuner.innerHTML = Object.entries(TUNING).map(([k, t]) => `
+    <label><span>${t.label}</span><span id="v-${k}">${t.value.toFixed(2)}</span>
+      <input type="range" data-k="${k}" min="${t.min}" max="${t.max}" step="${t.step}" value="${t.value}"></label>`).join("") +
+    `<label><span>paper texture</span><span id="v-paper">${paperStrength.toFixed(2)}</span>
+      <input type="range" id="paper-slider" min="0" max="1" step="0.01" value="${paperStrength}"></label>` +
+    `<div class="row"><button id="t-copy">copy settings</button><button id="t-reset">reset</button></div>`;
+  tuner.querySelectorAll("input").forEach((inp) => inp.addEventListener("input", () => {
+    const k = inp.dataset.k; TUNING[k].value = +inp.value; $("#v-" + k).textContent = (+inp.value).toFixed(2);
+    localStorage.setItem("freya-gem-tuning", JSON.stringify(Object.fromEntries(Object.entries(TUNING).map(([k, t]) => [k, t.value]))));
+  }));
+  $("#paper-slider").addEventListener("input", (e) => {
+    paperStrength = +e.target.value; $("#v-paper").textContent = paperStrength.toFixed(2);
+    document.documentElement.style.setProperty("--paper", paperStrength); localStorage.setItem("freya-paper", paperStrength);
+  });
+  $("#t-copy").onclick = async () => {
+    const text = JSON.stringify({ ...Object.fromEntries(Object.entries(TUNING).map(([k, t]) => [k, t.value])), paper: paperStrength });
+    try { await navigator.clipboard.writeText(text); $("#t-copy").textContent = "copied!"; } catch (e) { prompt("copy these settings:", text); }
+    setTimeout(() => ($("#t-copy").textContent = "copy settings"), 1500);
+  };
+  $("#t-reset").onclick = () => { for (const k in TUNING) TUNING[k].value = TUNING_DEFAULTS[k]; localStorage.removeItem("freya-gem-tuning");
+    paperStrength = 0.35; localStorage.removeItem("freya-paper"); document.documentElement.style.setProperty("--paper", paperStrength); drawTuner(); };
+}
+drawTuner();
+$("#tuner-toggle").onclick = () => tuner.classList.toggle("open");
+
+const fb = document.querySelectorAll("#fonts button");
+function setFont(f) { document.body.classList.remove("f-a", "f-b", "f-c", "f-d", "f-e"); document.body.classList.add(f); fb.forEach(b => b.classList.toggle("on", b.dataset.f === f)); history.replaceState(null, "", "#" + f); }
+fb.forEach(b => b.onclick = () => setFont(b.dataset.f));
+setFont(location.hash.slice(1) || "f-a");
+
+const tick = () => $("#clock").textContent = new Date().toLocaleTimeString("en-US", { timeZone: "America/Los_Angeles", hour: "numeric", minute: "2-digit" }).toLowerCase();
+tick(); setInterval(tick, 30000);
+</script>
+</body>
+</html>
