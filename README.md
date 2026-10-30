@@ -28,3 +28,8 @@ Every visit shows a new random arrangement. Add `?seed=27` (any number) to pin o
 ## Publish
 
 The site is served by GitHub Pages from the `main` branch.
+
+## After changing a file
+
+The `?v=…` numbers on the scripts in `index.html` make browsers fetch the new version right away.
+When you change a file in `js/`, bump its number (any new number works).
