@@ -10,7 +10,7 @@
 
 // ---------- The intro card ----------
 const intro = {
-  greeting: "hi, i'm freya",
+  greeting: "hi, i’m <i>Freya</i>",   // <i>…</i> = italic
   tagline: "applied math (data science) @ uc berkeley",
   links: [
     { label: "résumé", url: "resume.pdf" },         // put resume.pdf in the main folder

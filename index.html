@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Freya Sutedja</title>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,300..700,0..100,0..1&family=Young+Serif&family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,300..700&family=Rubik:wght@400;500&family=Caveat:wght@400;600&family=IBM+Plex+Mono&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,300..700,0..100,0..1;1,9..144,300..700,0..100,0..1&family=Young+Serif&family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,300..700&family=Rubik:wght@400;500&family=Caveat:wght@400;600&family=IBM+Plex+Mono&display=swap" rel="stylesheet">
 <link href="https://api.fontshare.com/v2/css?f[]=chillax@400,500&display=swap" rel="stylesheet">
 <style>
   :root { --bg: #f1eeea; --paper: #f8f6f2; --ink: #3a3433; --soft: #6b615e; --muted: #9a908c; --rose: #b0707c; --line: #ddd5cc;
@@ -48,6 +48,10 @@
   header { position: fixed; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; padding: 22px 4vw; color: var(--muted); z-index: 5; pointer-events: none; }
   .hello { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(var(--fit, 1)); width: 760px; text-align: center; z-index: 3; transition: opacity .5s; }
   body.open .hello { opacity: 0; pointer-events: none; }
+  /* the italic F in the title: same font and weight, just its real italic */
+  /* title (draft B): upright "hi, i’m" + italic "Freya", both Fraunces at weight 440 */
+  .hello h1#greeting { font-weight: 440 !important; font-variation-settings: "SOFT" 100, "WONK" 0, "opsz" 144 !important; letter-spacing: -0.01em; }
+  .hello h1 i { font-style: italic; font-weight: 440; font-variation-settings: "SOFT" 100, "WONK" 1, "opsz" 144; }
   .hello h1 { font-family: var(--display); font-weight: 400; font-size: 104px; line-height: 1; letter-spacing: -0.02em; white-space: nowrap; }
   .hello .tag { margin-top: 14px; color: var(--soft); text-transform: none; font-size: 13px; letter-spacing: .06em; }
   .hello .links { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
@@ -141,7 +145,7 @@
 <script>
 const $ = s => document.querySelector(s);
 const linkList = links => links.map(l => l.url.startsWith("mailto:") ? `<a href="${l.url}">${l.label}</a>` : `<a href="${l.url}" target="_blank" rel="noopener">${l.label}</a>`).join("");
-$("#greeting").textContent = intro.greeting;
+$("#greeting").innerHTML = intro.greeting; // allows the italic F
 $("#tagline").textContent = intro.tagline;
 $("#links").innerHTML = linkList(intro.links);
 
