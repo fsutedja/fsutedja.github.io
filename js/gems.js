@@ -130,9 +130,22 @@ function layoutGems(W, H, fit, sectionGems, quiet) {
     const kind = roll < 0.1 ? "big" : roll < 0.58 ? "medium" : "small";
     const name = pick(kind === "big" ? BIG : kind === "medium" ? MEDIUM : SMALL);
     const r = between(SIZES[kind]);
-    const x = rand() * W, y = rand() * H;
     const gap = (10 + rand() * 46) * fit; // uneven spacing
-    if (!fits(x, y, r, gap) || !varietyOK(name, x, y, r)) continue;
+    // balance: try several random spots and take the one with the most empty space around it,
+    // so gems spread evenly over the whole page (big gems also keep away from other big gems)
+    let x = 0, y = 0, best = -1;
+    for (let c = 0; c < 10; c++) {
+      const cx2 = rand() * W, cy2 = rand() * H;
+      if (!fits(cx2, cy2, r, gap) || !varietyOK(name, cx2, cy2, r)) continue;
+      let room = Infinity;
+      for (const o of placed) {
+        const d = Math.hypot(o.x - cx2, o.y - cy2) - o.r - r;
+        room = Math.min(room, (isLarge(r) && isLarge(o.r)) ? d * 0.6 : d);   // big next to big counts as more crowded
+      }
+      room = Math.min(room, 2.2 * cx2, 2.2 * (W - cx2), 2.2 * (cy2 - 54), 2.2 * (H - cy2)) + rand() * 25 * fit;   // edges count a little too; some randomness keeps it natural
+      if (room > best) { best = room; x = cx2; y = cy2; }
+    }
+    if (best < 0) continue;
     placed.push({ name, x, y, r, rot: ROTATES.has(name) ? (rand() - 0.5) * 0.9 : 0 });
     // a little cluster of 1–2 small gems right beside it, like on the petals
     if (rand() < 0.16) {
