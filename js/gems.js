@@ -113,6 +113,17 @@ function layoutGems(W, H, fit, sectionGems, quiet) {
   });
 
   // then everything else: a mix of sizes, uneven gaps, sometimes a little cluster
+  // variety rules for the larger gems: each kind only a few times, and never two of the same kind close together
+  const family = (n) => /^aqua/.test(n) ? "aqua" : /^pink/.test(n) ? "pink" : /^lilac\d/.test(n) ? "lilac" : /Star/.test(n) ? "star"
+    : /^clear/.test(n) ? "clear" : /^pearl/.test(n) ? "pearl" : /sequin/.test(n) ? "sequin" : /^gold/.test(n) ? "gold" : n;
+  const LIMIT = { aqua: 2, pink: 2, lilac: 2, star: 3, clear: 4, pearl: 3, sequin: 1, peach: 1 };
+  const isLarge = (r) => r >= SIZES.medium[0] * fit;
+  const varietyOK = (name, x, y, r) => {
+    if (!isLarge(r)) return true;
+    const f = family(name), same = placed.filter((o) => isLarge(o.r) && family(o.name) === f);
+    if (same.length >= (LIMIT[f] ?? 2)) return false;
+    return same.every((o) => Math.hypot(o.x - x, o.y - y) > 300 * fit);
+  };
   const target = Math.round((W * H) / (W <= 700 ? 15000 : 26000)); // phones: a bit denser, so they don't look empty
   for (let tries = 0; placed.length < target && tries < 9000; tries++) {
     const roll = rand();
@@ -121,7 +132,7 @@ function layoutGems(W, H, fit, sectionGems, quiet) {
     const r = between(SIZES[kind]);
     const x = rand() * W, y = rand() * H;
     const gap = (10 + rand() * 46) * fit; // uneven spacing
-    if (!fits(x, y, r, gap)) continue;
+    if (!fits(x, y, r, gap) || !varietyOK(name, x, y, r)) continue;
     placed.push({ name, x, y, r, rot: ROTATES.has(name) ? (rand() - 0.5) * 0.9 : 0 });
     // a little cluster of 1–2 small gems right beside it, like on the petals
     if (rand() < 0.16) {
