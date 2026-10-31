@@ -129,12 +129,29 @@
   body.try .exit-try { display: flex; }
   .exit-try button { font: inherit; background: none; border: 1px solid transparent; border-radius: 999px; padding: 5px 11px; cursor: pointer; color: #3a3433; }
   .exit-try button.on { border-color: #3a3433; }
+  /* typing animation for the tagline */
+  .tag .untyped { visibility: hidden; }
+  .tag .caret { display: inline-block; width: 0; height: 1.15em; vertical-align: -0.2em; border-left: 1.5px solid currentColor; margin-right: -1.5px;
+                animation: blink 1s steps(1) infinite; transition: opacity .6s; }
+  .tag .caret.typing { animation: none; }          /* solid while typing, blinks when it stops */
+  .tag .caret.gone { opacity: 0; animation: none; }
+  @keyframes blink { 50% { opacity: 0; } }
+  /* links in the top bar (trying out: ?links=a = centre of the bar, ?links=c = right side with the time) */
+  header .links { display: flex; gap: 18px; pointer-events: auto; }
+  header .links a { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--line); padding-bottom: 1px; }
+  header .links a:hover { color: var(--rose); border-color: var(--rose); }
+  header .right { display: flex; align-items: center; gap: 18px; }
+  header { align-items: center; }
+  @media (max-width: 700px) {
+    body.links-top header .right #clock, body.links-top header .where { display: none; }   /* phones: no room for the time too */
+    header .links { gap: 12px; }
+  }
 </style>
 
 </head>
 <body>
 <div class="field" id="field"></div>
-<header class="mono"><span>freya sutedja</span><span><span class="where">berkeley, ca · </span><span id="clock"></span></span></header>
+<header class="mono" id="topbar"><span>freya sutedja</span><span class="right"><span class="where">berkeley, ca · </span><span id="clock"></span></span></header>
 
 <main>
   <section class="screen" id="intro">
@@ -174,7 +191,39 @@
 const $ = s => document.querySelector(s);
 const linkList = links => links.map(l => l.url.startsWith("mailto:") ? `<a href="${l.url}">${l.label}</a>` : `<a href="${l.url}" target="_blank" rel="noopener">${l.label}</a>`).join("");
 $("#greeting").innerHTML = intro.greeting; // allows the italic F
-$("#tagline").textContent = intro.tagline;
+/* the tagline types itself out, letter by letter, with a blinking cursor.
+   The not-yet-typed letters are already there but invisible, so nothing on the page shifts while it types. */
+function typeTagline(text) {
+  const el = $("#tagline");
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) { el.textContent = text; return; }
+  const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  let i = 0;
+  const show = (typing) => {
+    el.innerHTML = `${esc(text.slice(0, i))}<span class="caret${typing ? " typing" : ""}"></span><span class="untyped">${esc(text.slice(i))}</span>`;
+  };
+  show(true);
+  const step = () => {
+    i++; show(true);
+    if (i < text.length) {
+      const ch = text[i - 1];
+      // a human rhythm: small random variation, a little pause after spaces and punctuation
+      setTimeout(step, 30 + Math.random() * 36 + (ch === " " ? 30 : 0) + (/[),@]/.test(ch) ? 95 : 0));
+    } else {
+      show(false);                                                  // done: the cursor blinks for a moment…
+      setTimeout(() => el.querySelector(".caret")?.classList.add("gone"), 3200);   // …then fades away
+    }
+  };
+  setTimeout(step, 700);   // start shortly after the page appears
+}
+typeTagline(intro.tagline);
+
+// where the links go: under the tagline (default), or in the top bar
+const linksAt = new URLSearchParams(location.search).get("links") || "a";   // "a" = middle of the top bar (chosen)
+if (linksAt === "a" || linksAt === "c") {
+  const nav = $("#links"); document.body.classList.add("links-top");
+  if (linksAt === "a") $("#topbar").insertBefore(nav, $("#topbar .right"));   // name · links · time
+  else $("#topbar .right").prepend(nav);                                      // name ········ links · time
+}
 $("#links").innerHTML = linkList(intro.links);
 
 const sections = [
