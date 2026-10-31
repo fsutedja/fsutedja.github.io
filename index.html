@@ -111,9 +111,9 @@
     html, body { overscroll-behavior: none; }
     header { padding: 16px 20px; font-size: 10px; }
     header .where { display: none; }                       /* keep just the time */
-    .hello { width: 92vw; transform: translate(-50%, -50%); }   /* no shrinking: sized with the screen instead */
+    .hello { width: 92vw; transform: translate(-50%, -50%) scale(var(--fit, 1)); }   /* sized with the screen; also shrinks if the window is very short */
     .hello h1 { font-size: clamp(46px, 15vw, 80px); }
-    .hello .tag { margin-top: 18px; font-size: clamp(10.5px, 3.1vw, 12px); white-space: nowrap; letter-spacing: .03em; }
+    .hello .tag { margin-top: 18px; font-size: max(clamp(10.5px, 3.1vw, 12px), calc(9.5px / var(--fit, 1))); white-space: nowrap; letter-spacing: .03em; }
     .hello .links { gap: 6px 18px; margin-top: 16px; }
     .hello .links a { padding: 8px 2px; }                   /* bigger tap targets */
     .panel { padding: 64px 24px 40px; }
@@ -161,6 +161,10 @@
         #e8a9bb 0%, #c9a6e0 22%, #9fd3d6 38%, #3a3433 62%) var(--ink); -webkit-background-clip: text; background-clip: text; color: transparent;
         padding: .12em .05em .25em; margin: -.12em -.05em -.25em; }   /* room for the y's tail and the apostrophe */
   body.text-sheen #greeting i { color: transparent; }
+  @media (max-width: 700px) {
+    /* phones / small windows: the email is a touch smaller than the tagline, and never shrinks to unreadable */
+    body.email-below .email-line { font-size: max(clamp(10px, 2.9vw, 11px), calc(9px / var(--fit, 1))); }
+  }
 </style>
 
 </head>
@@ -314,7 +318,8 @@ function fadeTitle() {
   gemsLeft = Math.max(0, Math.min(1, (top - barBottom + 12) / travel)); // 1 at the top of the page → 0 exactly when the text is gone
   // the exact area the words cover right now (gems are kept out of it)
   textBox = null;
-  for (const el of [$("#greeting"), $("#tagline")]) {
+  for (const el of [$("#greeting"), $("#tagline"), $("#email-line")]) {
+    if (!el.offsetParent || !el.textContent.trim()) continue;   // skip if hidden or empty
     const r = document.createRange(); r.selectNodeContents(el); const b = r.getBoundingClientRect();
     textBox = textBox ? { l: Math.min(textBox.l, b.left), r: Math.max(textBox.r, b.right), t: Math.min(textBox.t, b.top), b: Math.max(textBox.b, b.bottom) }
                       : { l: b.left, r: b.right, t: b.top, b: b.bottom };
@@ -381,10 +386,11 @@ function build() {
   const phone = W <= 700;
   // desktop: the words shrink together on small windows. Phones size the words with CSS instead.
   // how much the words shrink on smaller screens (tablets in portrait and phones held sideways shrink less than before)
-  fit = phone ? 1 : Math.min(1, W / 900, H / 560);
+  // narrow screens size the words with CSS; any window that's short (tiny browser window, phone sideways) shrinks everything to fit
+  fit = phone ? Math.min(1, H / 600) : Math.min(1, W / 900, H / 560);
   $("#hello").style.setProperty("--fit", fit);
   // gem size: smaller on phones, but not tiny
-  const gemFit = phone ? Math.max(0.62, W / 620) : Math.max(fit, H > W ? 0.88 : 0.7);   // tablets in portrait: gems not too small
+  const gemFit = phone ? Math.max(0.62, W / 620) * Math.max(0.6, fit) : Math.max(fit, H > W ? 0.88 : 0.7);   // tablets in portrait: gems not too small
   // keep gems clear of the actual words (measured, so it works at any size)
   const box = $("#hello").getBoundingClientRect();
   const quiet = { x: Math.max(box.width / 2 + 10, phone ? 0 : 380 * fit), y: Math.max(box.height / 2 + 26, phone ? 0 : 150 * fit) };
@@ -510,11 +516,16 @@ function frame(ms) {
     const d = Math.hypot(light.x - gx, light.y - gy);
     const near = Math.max(0, 1 - d / 420);                          // how strongly this gem is lit
     const e = exitPose(g, gx, gy, g.size, rot, p);
-    // keep gems off the words: if one is in the way, it's nudged just outside the text (above or below)
-    if (textBox && gemsLeft > 0) {
+    // keep gems off the words, smoothly: each gem stays on the side of the text it started on
+    // (above or below). If the text comes toward it while you scroll, the gem is gently pushed ahead of it.
+    if (textBox) {
+      if (g.side == null) g.side = g.y < (textBox.t + textBox.b) / 2 ? -1 : 1;
       const rad = g.r * (e.size / g.size) * 1.05 + 6;
-      if (e.x > textBox.l - rad && e.x < textBox.r + rad && e.y > textBox.t - rad && e.y < textBox.b + rad) {
-        e.y = e.y < (textBox.t + textBox.b) / 2 ? textBox.t - rad : textBox.b + rad;
+      // how much the gem lines up with the text horizontally (0 = clear of it, 1 = fully in line), soft at the ends
+      const inX = Math.max(0, Math.min(1, (Math.min(e.x + rad - textBox.l, textBox.r - (e.x - rad))) / (rad * 1.5)));
+      if (inX > 0) {
+        if (g.side < 0 && e.y > textBox.t - rad) e.y -= (e.y - (textBox.t - rad)) * inX;
+        if (g.side > 0 && e.y < textBox.b + rad) e.y += ((textBox.b + rad) - e.y) * inX;
       }
     }
     if (e.alpha <= 0.01 || e.size < 0.5 || e.y > innerHeight + 200 || e.y < -200 || e.x < -200 || e.x > innerWidth + 200) return;
