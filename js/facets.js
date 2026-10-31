@@ -126,8 +126,11 @@ async function makeFacetSprites() {
       let mn = Math.min(col[p * 4], col[p * 4 + 1], col[p * 4 + 2]);
       lum[p] = 0.3 * col[p * 4] + 0.59 * col[p * 4 + 1] + 0.11 * col[p * 4 + 2];
       // part of the gem if it's coloured, OR inside the gem's shape (so white highlights and bright pearl sides count too)
-      const insideShape = smoothGem ? d <= 0.92 : Math.hypot(x - half, y - half) <= smoothOutline[k];
-      mask[p] = insideShape || 255 - mn > 40 ? 1 : 0;   // outside the shape, only clearly coloured pixels count
+      const insideShape = smoothGem ? d <= 0.97 : Math.hypot(x - half, y - half) <= smoothOutline[k];
+      // the gem is its outline, minus any blank (paper-white) band right at the edge, so no flat ring covers the paper texture.
+      // Deeper inside, white highlights still count as gem.
+      const rimZone = smoothGem ? d > 0.8 : Math.hypot(x - half, y - half) > smoothOutline[k] - 3;
+      mask[p] = insideShape && (!rimZone || 255 - mn > 14) ? 1 : 0;
     }
 
     // stars: measuring "inside" outward from the centre wrongly fills the gaps between the points,
@@ -272,7 +275,7 @@ function makeFacetRenderer(canvas) {
     const vec3 PAPER = vec3(.945, .933, .918);
     vec4 onPaper(vec3 c, vec3 base, float inside) {
       // inside the gem's outline it's solid; outside, only as solid as it is non-white (soft edges)
-      float a = max(inside, smoothstep(.1, .32, 1. - min(base.r, min(base.g, base.b))));
+      float a = inside;
       vec3 col = PAPER * (c - (1. - a)) / max(a, .001);
       return vec4(clamp(col, 0., 1.), a);
     }
@@ -298,7 +301,7 @@ function makeFacetRenderer(canvas) {
 
       vec4 base = texture2D(colorTex, guv);
       vec4 nm = texture2D(normalTex, guv);
-      if (nm.a < .5) { gl_FragColor = onPaper(base.rgb, base.rgb, 0.); return; }   // outside the gem: (almost) transparent
+      if (nm.a < .02) { gl_FragColor = vec4(0.); return; }   // outside the gem: fully transparent
       vec2 nxy = nm.rg * 2. - 1.;
       vec3 n = vec3(nxy, sqrt(max(0., 1. - dot(nxy, nxy))));
       // everything below is turned into the gem's own (rotated) frame, because that's how its facets were measured
@@ -341,7 +344,8 @@ function makeFacetRenderer(canvas) {
       // a soft pastel lift, so the gems stay light and airy on the page
       c = mix(c, vec3(1.), uPastel * solid * (1. - smoothGem * .8));
       c = mix(c, c * uBright, solid);
-      gl_FragColor = onPaper(min(c, vec3(1.)), base.rgb, smoothstep(.5, 1., nm.a));
+      // coverage comes from the gem's (smoothly filtered) outline, so the edge is a soft, even fade, not a dotted line
+      gl_FragColor = onPaper(min(c, vec3(1.)), base.rgb, smoothstep(.2, .8, nm.a));
     }`;
   const sh = (t, s) => { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(o)); return o; };
   const prog = gl.createProgram();
@@ -369,7 +373,7 @@ function makeFacetRenderer(canvas) {
     const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, pot(c, !isNormal));
     gl.generateMipmap(gl.TEXTURE_2D);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, isNormal ? gl.LINEAR_MIPMAP_NEAREST : gl.LINEAR_MIPMAP_LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     textures.set(c, t); return t;
@@ -378,7 +382,7 @@ function makeFacetRenderer(canvas) {
 
   return {
     resize(w, h) {
-      const dpr = Math.min(devicePixelRatio || 1, 2);
+      const dpr = Math.min(devicePixelRatio || 1, 3);
       canvas.width = w * dpr; canvas.height = h * dpr; canvas.style.width = w + "px"; canvas.style.height = h + "px";
       gl.viewport(0, 0, canvas.width, canvas.height); this.dpr = dpr;
     },
