@@ -48,11 +48,11 @@
   .glint::after { width: 62%; transform: translate(-50%, -50%) rotate(calc(var(--r, 0deg) + 90deg)); }
 
   header { position: fixed; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; padding: 22px 4vw; color: var(--muted); z-index: 5; pointer-events: none; }
-  .hello { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(var(--fit, 1)); width: 760px; text-align: center; z-index: 3; transition: opacity .5s; }
+  .hello { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(var(--fit, 1)); width: 760px; text-align: center; z-index: 3; }
   body.open .hello { opacity: 0; pointer-events: none; }
   /* the italic F in the title: same font and weight, just its real italic */
   /* title (draft B): upright "hi, i’m" + italic "Freya", both Fraunces at weight 440 */
-  .hello h1#greeting { font-weight: 440 !important; font-variation-settings: "SOFT" 100, "WONK" 0, "opsz" 144 !important; letter-spacing: -0.01em; }
+  .hello h1#greeting { font-weight: 440 !important; font-variation-settings: "SOFT" 100, "WONK" 0, "opsz" 144 !important; letter-spacing: -0.025em; }
   .hello h1 i { font-style: italic; font-weight: 440; font-variation-settings: "SOFT" 100, "WONK" 1, "opsz" 144; }
   .hello h1 { font-family: var(--display); font-weight: 400; font-size: 104px; line-height: 1; letter-spacing: -0.02em; white-space: nowrap; }
   .hello .tag { margin-top: 14px; color: var(--soft); text-transform: none; font-size: 13px; letter-spacing: .06em; }
@@ -186,7 +186,7 @@
 <script src="js/content.js?v=1793407224"></script>
 <script>window.GEM_SHEET = "images/gem-sheet.png";</script>
 <script src="js/gems.js?v=1793406696"></script>
-<script src="js/facets.js?v=1793409388"></script>
+<script src="js/facets.js?v=1793422330"></script>
 <script>
 const $ = s => document.querySelector(s);
 const linkList = links => links.map(l => l.url.startsWith("mailto:") ? `<a href="${l.url}">${l.label}</a>` : `<a href="${l.url}" target="_blank" rel="noopener">${l.label}</a>`).join("");
@@ -218,6 +218,18 @@ function typeTagline(text) {
 typeTagline(intro.tagline);
 
 // where the links go: under the tagline (default), or in the top bar
+// as you scroll, the title fades out before it reaches the top bar (so they never overlap)
+function fadeTitle() {
+  const hello = $("#hello"), barBottom = $("#topbar").getBoundingClientRect().bottom;
+  const top = hello.getBoundingClientRect().top;
+  const o = Math.max(0, Math.min(1, (top - barBottom + 12) / 110));   // fully gone just as it reaches the bar's text, starts fading ~100px before
+  hello.style.opacity = o;
+  hello.style.pointerEvents = o < 0.1 ? "none" : "";
+}
+addEventListener("scroll", () => requestAnimationFrame(fadeTitle), { passive: true });
+addEventListener("resize", fadeTitle);
+fadeTitle();
+
 const linksAt = new URLSearchParams(location.search).get("links") || "a";   // "a" = middle of the top bar (chosen)
 if (linksAt === "a" || linksAt === "c") {
   const nav = $("#links"); document.body.classList.add("links-top");
@@ -239,7 +251,7 @@ let sprites = null, gems = [], fit = 1;
 
 // one canvas holds all the gems; it multiplies onto the page so white disappears
 const canvas = document.createElement("canvas");
-canvas.style.cssText = "position:absolute; inset:0; mix-blend-mode:multiply;";   // gems multiply onto the real paper (white = invisible)
+canvas.style.cssText = "position:absolute; inset:0;";   // gems are drawn on top of the paper (white facets stay bright)
 const renderer = makeFacetRenderer(canvas);
 
 function build() {

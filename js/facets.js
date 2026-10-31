@@ -69,7 +69,7 @@ async function makeFacetSprites() {
       const hole = (n ? sum / n : r * 0.2);
       // fill everything up to well past the hole's edge (the pale rim around the hole goes too),
       // taking colour from further out on the stone at the same angle, and blending in smoothly
-      const inner = hole * 1.9, blend = hole * 0.6;
+      const inner = Math.max(hole * 1.9, r * 0.34), blend = hole * 0.6;
       const copy = col.slice();
       for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
         const dx = x - half, dy = y - half, d = Math.hypot(dx, dy);
@@ -166,8 +166,7 @@ async function makeFacetSprites() {
       const m0 = new Uint8Array(N);
       for (let q = 0; q < N; q++) {
         const R = col[q * 4], G = col[q * 4 + 1], B = col[q * 4 + 2];
-        const grey = Math.max(R, G, B) - Math.min(R, G, B) < 14 && flat[q];   // flat colourless = shadow, not crystal
-        m0[q] = ink(q) > 22 && !grey ? 1 : 0;
+        m0[q] = ink(q) > 22 ? 1 : 0;   // (clear crystal is colourless too, so colour can't tell shadow apart: keep it all)
       }
       const R = Math.max(2, Math.round(size / 70));
       const morph = (src, grow) => {
@@ -355,8 +354,7 @@ function makeFacetRenderer(canvas) {
 
       vec4 base = texture2D(colorTex, guv);
       vec4 nm = texture2D(normalTex, guv);
-      // how much of this pixel is gem: the smooth outline only. White parts of the picture don't need cutting out,
-      // because the canvas multiplies onto the page: white x paper = exactly the paper underneath.
+      // how much of this pixel is gem: the smooth, tight outline. Inside it, white facets are drawn bright white.
       float cover = texture2D(coverTex, guv).r * uAlpha;   // uAlpha: fading out (scroll animation)
       if (cover < .004) { gl_FragColor = vec4(0.); return; }   // outside the gem: fully transparent
       vec2 nxy = nm.rg * 2. - 1.;
@@ -402,9 +400,6 @@ function makeFacetRenderer(canvas) {
       c = mix(c, vec3(1.), uPastel * solid * (1. - smoothGem * .8));
       c = mix(c, c * uBright, solid);
       // coverage comes from the gem's (smoothly filtered) outline, so the edge is a soft, even fade, not a dotted line
-      // pearls are nearly white, so on white paper their brightest side would vanish: give it a soft pearly tint
-      float pl = dot(c, vec3(.3, .59, .11));
-      c = mix(c, c * vec3(.955, .935, .94), smoothGem * smoothstep(.78, 1., pl));
       gl_FragColor = vec4(min(c, vec3(1.)) * cover, cover);   // premultiplied colour
     }`;
   const sh = (t, s) => { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(o)); return o; };
