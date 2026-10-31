@@ -325,7 +325,7 @@ let exitStyle = new URLSearchParams(location.search).get("exit") || "scatter";
 const ease = (x) => x < 0 ? 0 : x > 1 ? 1 : x * x * (3 - 2 * x);
 function exitPose(g, x, y, size, rot, p) {
   const W = innerWidth, H = innerHeight, cx = W / 2, cy = H / 2;
-  const t = ease((p - g.stagger) / 0.55);              // this gem's own progress, 0 → 1
+  const t = ease((p - g.stagger) / 0.6);              // this gem's own progress, 0 → 1
   if (t <= 0) return { x, y, size, rot, alpha: 1, flash: 0 };
   const dx = x - cx, dy = y - cy, dist = Math.hypot(dx, dy) || 1;
   if (exitStyle === "scatter") {
@@ -364,9 +364,10 @@ function frame(ms) {
   view.x += (want.x - view.x) * .06; view.y += (want.y - view.y) * .06;
   // the light: your cursor; when it's away, a light slowly drifts around above the page
   const light = mouse || { x: innerWidth * (.5 + .42 * Math.cos(t * .23)), y: innerHeight * (.45 + .4 * Math.sin(t * .31)) };
-  const p = Math.max(0, Math.min(1.2, scrollY / innerHeight));   // scroll progress through the first screen
+  // scroll progress: gems are gone after ~40% of a screen on phones, ~60% on bigger screens
+  const p = Math.max(0, Math.min(1.2, scrollY / (innerHeight * (innerWidth <= 700 ? 0.4 : 0.6))));
   gems.forEach((g) => {
-    if (g.stagger == null) { g.stagger = Math.random() * 0.35; g.spin = (Math.random() - 0.5) * 2; }
+    if (g.stagger == null) { g.stagger = Math.random() * 0.3; g.spin = (Math.random() - 0.5) * 2; }
     // gentle drift, and sliding softly out of the cursor's way
     let tx = Math.sin(t * g.speed + g.phase) * g.amp, ty = Math.cos(t * g.speed * .8 + g.phase * 1.7) * g.amp;
     if (mouse) {
