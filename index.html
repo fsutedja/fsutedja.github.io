@@ -137,7 +137,7 @@
   .tag .caret.gone { opacity: 0; animation: none; }
   @keyframes blink { 50% { opacity: 0; } }
   /* links in the top bar (trying out: ?links=a = centre of the bar, ?links=c = right side with the time) */
-  header .links { display: flex; gap: 18px; pointer-events: auto; }
+  header .links { display: flex; gap: 18px; pointer-events: auto; position: absolute; left: 50%; transform: translateX(-50%); }   /* exactly centred */
   header .links a { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--line); padding-bottom: 1px; }
   header .links a:hover { color: var(--rose); border-color: var(--rose); }
   header .right { display: flex; align-items: center; gap: 18px; }
@@ -149,9 +149,15 @@
   /* text in the links row that isn't a link (the written-out email) */
   .links .plain { color: var(--muted); text-transform: none; letter-spacing: .03em; }
   .email-line { display: none; }
+  /* email placement on laptops (trying out: ?email=below or ?email=bottom) */
+  body.email-below header .links .plain, body.email-bottom header .links .plain { display: none; }
+  body.email-below .email-line { display: block; margin-top: 8px; color: var(--muted); font-size: 12px; letter-spacing: .04em; text-transform: none; }
+  .email-bottom-line { display: none; position: absolute; left: 0; right: 0; bottom: 26px; text-align: center; color: var(--muted);
+                       font-size: 11px; letter-spacing: .05em; text-transform: none; z-index: 3; }
+  body.email-bottom .email-bottom-line { display: block; }
   @media (max-width: 700px) {
     header .links .plain { display: none; }                         /* phones: too long for the top bar… */
-    .email-line { display: block; margin-top: 14px; color: var(--muted); font-size: 11px; letter-spacing: .03em; text-transform: none; }  /* …so it sits under the tagline */
+    .email-line { display: block; margin-top: 7px; color: var(--muted); font-size: 11px; letter-spacing: .03em; text-transform: none; }  /* …so it sits under the tagline */
   }
 </style>
 
@@ -168,6 +174,7 @@
       <p class="mono email-line" id="email-line"></p>
       <nav class="links mono" id="links"></nav>
     </div>
+    <p class="mono email-bottom-line" id="email-bottom"></p>
   </section>
   <!-- the next screen: empty for now -->
   <section class="screen" id="next"></section>
@@ -224,7 +231,8 @@ function typeTagline(text) {
   setTimeout(step, 700);   // start shortly after the page appears
 }
 typeTagline(intro.tagline);
-{ const plain = intro.links.find((l) => !l.url); if (plain) $("#email-line").textContent = plain.label; }
+{ const plain = intro.links.find((l) => !l.url); if (plain) { $("#email-line").textContent = plain.label; $("#email-bottom").textContent = plain.label; } }
+{ const e = new URLSearchParams(location.search).get("email") || "below"; if (e === "below" || e === "bottom") document.body.classList.add("email-" + e); }   // "below" = chosen
 
 // where the links go: under the tagline (default), or in the top bar
 let gemsLeft = 1, textBox = null;
