@@ -364,8 +364,8 @@ function frame(ms) {
   view.x += (want.x - view.x) * .06; view.y += (want.y - view.y) * .06;
   // the light: your cursor; when it's away, a light slowly drifts around above the page
   const light = mouse || { x: innerWidth * (.5 + .42 * Math.cos(t * .23)), y: innerHeight * (.45 + .4 * Math.sin(t * .31)) };
-  // scroll progress: gems are gone after ~40% of a screen on phones, ~60% on bigger screens
-  const p = Math.max(0, Math.min(1.2, scrollY / (innerHeight * (innerWidth <= 700 ? 0.4 : 0.6))));
+  // scroll progress: gems are gone after ~70% of a screen on phones, ~60% on bigger screens
+  const p = Math.max(0, Math.min(1.2, scrollY / (innerHeight * (innerWidth <= 700 ? 0.7 : 0.6))));
   gems.forEach((g) => {
     if (g.stagger == null) { g.stagger = Math.random() * 0.3; g.spin = (Math.random() - 0.5) * 2; }
     // gentle drift, and sliding softly out of the cursor's way
