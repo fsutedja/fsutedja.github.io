@@ -16,7 +16,7 @@ const intro = {
     // { label: "résumé", url: "resume.pdf" },      // hidden for now: remove the // to bring it back
     { label: "linkedin", url: "https://www.linkedin.com/in/freyaas/" },
     { label: "github", url: "https://github.com/fsutedja" },
-    { label: "email", url: "mailto:freyas@berkeley.edu" }, // keep "mailto:" in front of the email
+    { label: "freyas [at] berkeley [dot] edu" },             // no url = shown as plain text, not a link
   ],
 };
 

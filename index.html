@@ -146,6 +146,13 @@
     body.links-top header .right #clock, body.links-top header .where { display: none; }   /* phones: no room for the time too */
     header .links { gap: 12px; }
   }
+  /* text in the links row that isn't a link (the written-out email) */
+  .links .plain { color: var(--muted); text-transform: none; letter-spacing: .03em; }
+  .email-line { display: none; }
+  @media (max-width: 700px) {
+    header .links .plain { display: none; }                         /* phones: too long for the top bar… */
+    .email-line { display: block; margin-top: 14px; color: var(--muted); font-size: 11px; letter-spacing: .03em; text-transform: none; }  /* …so it sits under the tagline */
+  }
 </style>
 
 </head>
@@ -158,6 +165,7 @@
     <div class="hello" id="hello">
       <h1 id="greeting"></h1>
       <p class="mono tag" id="tagline"></p>
+      <p class="mono email-line" id="email-line"></p>
       <nav class="links mono" id="links"></nav>
     </div>
   </section>
@@ -183,13 +191,13 @@
 </div>
 
 <script>if (new URLSearchParams(location.search).has("tune")) document.body.classList.add("tune");</script>
-<script src="js/content.js?v=1793407224"></script>
+<script src="js/content.js?v=1793423110"></script>
 <script>window.GEM_SHEET = "images/gem-sheet.png";</script>
 <script src="js/gems.js?v=1793423028"></script>
 <script src="js/facets.js?v=1793422330"></script>
 <script>
 const $ = s => document.querySelector(s);
-const linkList = links => links.map(l => l.url.startsWith("mailto:") ? `<a href="${l.url}">${l.label}</a>` : `<a href="${l.url}" target="_blank" rel="noopener">${l.label}</a>`).join("");
+const linkList = links => links.map(l => !l.url ? `<span class="plain">${l.label}</span>` : l.url.startsWith("mailto:") ? `<a href="${l.url}">${l.label}</a>` : `<a href="${l.url}" target="_blank" rel="noopener">${l.label}</a>`).join("");
 $("#greeting").innerHTML = intro.greeting; // allows the italic F
 /* the tagline types itself out, letter by letter, with a blinking cursor.
    The not-yet-typed letters are already there but invisible, so nothing on the page shifts while it types. */
@@ -216,6 +224,7 @@ function typeTagline(text) {
   setTimeout(step, 700);   // start shortly after the page appears
 }
 typeTagline(intro.tagline);
+{ const plain = intro.links.find((l) => !l.url); if (plain) $("#email-line").textContent = plain.label; }
 
 // where the links go: under the tagline (default), or in the top bar
 let gemsLeft = 1, textBox = null;
