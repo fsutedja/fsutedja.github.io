@@ -305,7 +305,7 @@ try { const saved = JSON.parse(localStorage.getItem("freya-gem-tuning") || "{}")
 
 // ---------- 3. light the facets live (WebGL) ----------
 function makeFacetRenderer(canvas) {
-  const gl = canvas.getContext("webgl", { premultipliedAlpha: false, alpha: true });
+  const gl = canvas.getContext("webgl", { premultipliedAlpha: true, alpha: true });   // premultiplied: every browser composites it the same way
   const VS = `
     attribute vec2 corner; uniform vec2 res, center; uniform float size, rot;
     varying vec2 uv;
@@ -355,9 +355,9 @@ function makeFacetRenderer(canvas) {
 
       vec4 base = texture2D(colorTex, guv);
       vec4 nm = texture2D(normalTex, guv);
-      vec2 cvt = texture2D(coverTex, guv).rg;
-      float ink = smoothstep(.012, .07, 1. - min(base.r, min(base.g, base.b)));
-      float cover = cvt.r * max(ink, cvt.g);   // plain white near the edge is see-through, so the real paper shows
+      // how much of this pixel is gem: the smooth outline only. White parts of the picture don't need cutting out,
+      // because the canvas multiplies onto the page: white x paper = exactly the paper underneath.
+      float cover = texture2D(coverTex, guv).r;
       if (cover < .004) { gl_FragColor = vec4(0.); return; }   // outside the gem: fully transparent
       vec2 nxy = nm.rg * 2. - 1.;
       vec3 n = vec3(nxy, sqrt(max(0., 1. - dot(nxy, nxy))));
@@ -402,7 +402,10 @@ function makeFacetRenderer(canvas) {
       c = mix(c, vec3(1.), uPastel * solid * (1. - smoothGem * .8));
       c = mix(c, c * uBright, solid);
       // coverage comes from the gem's (smoothly filtered) outline, so the edge is a soft, even fade, not a dotted line
-      gl_FragColor = onPaper(min(c, vec3(1.)), base.rgb, cover);
+      // pearls are nearly white, so on white paper their brightest side would vanish: give it a soft pearly tint
+      float pl = dot(c, vec3(.3, .59, .11));
+      c = mix(c, c * vec3(.955, .935, .94), smoothGem * smoothstep(.78, 1., pl));
+      gl_FragColor = vec4(min(c, vec3(1.)) * cover, cover);   // premultiplied colour
     }`;
   const sh = (t, s) => { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(o)); return o; };
   const prog = gl.createProgram();
@@ -413,7 +416,7 @@ function makeFacetRenderer(canvas) {
   const U = {}; ["res", "center", "size", "rot", "colorTex", "normalTex", "coverTex", "lightPos", "near", "smoothGem", "rainbow", "time", "view", "uLift", "uFlash", "uGain", "uPastel", "uSat", "uRainbow", "uLamp", "uView", "uBright", "uContrast", "uShadow", "uShadowSoft", "uShadowDist", "shadowPass", "pad"].forEach((n) => (U[n] = gl.getUniformLocation(prog, n)));
   gl.uniform1i(U.colorTex, 0); gl.uniform1i(U.normalTex, 1); gl.uniform1i(U.coverTex, 2);
   // gems are drawn as solid objects with soft edges, layered normally over the page
-  gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+  gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
   // Gem pictures are big (up to ~280 px) but drawn small (~20–60 px). To shrink them smoothly,
   // like the browser does for normal images, we copy each into a power-of-two square and build
