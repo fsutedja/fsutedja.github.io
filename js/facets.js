@@ -111,6 +111,21 @@ async function makeFacetSprites() {
       return v.sort((m, n) => m - n)[2];
     };
     const smoothOutline = Float32Array.from({ length: DIRS }, (_, k) => outlineAt(k));
+    // pearls and beads are round: measure their real radius from the picture (ignoring the shadow side)
+    let roundR = 0.97 * r;
+    if (smoothGem) {
+      const radii = [];
+      for (let j = 0; j < 72; j++) {
+        const a = (j / 72) * Math.PI * 2; let last = 0;
+        for (let rr = r * 0.3; rr < Math.min(half - 1, r * 1.3); rr += 0.5) {
+          const q = (Math.round(half + Math.sin(a) * rr) * size + Math.round(half + Math.cos(a) * rr)) * 4;
+          if (255 - Math.min(col[q], col[q + 1], col[q + 2]) > 18) last = rr;
+        }
+        radii.push(last);
+      }
+      radii.sort((m, n) => m - n);
+      roundR = Math.min(0.97 * r, radii[Math.floor(radii.length * 0.12)] - 1 || roundR);   // the shadow side reads too big, so use a low-ish value
+    }
     const cov = new Float32Array(N);   // how much of each pixel is gem (0–1): gives smooth, non-jagged edges
     const core = new Float32Array(N);  // the inner part of the gem, where even white highlights stay solid
     for (let p = 0; p < N; p++) {
@@ -128,7 +143,7 @@ async function makeFacetSprites() {
       let mn = Math.min(col[p * 4], col[p * 4 + 1], col[p * 4 + 2]);
       lum[p] = 0.3 * col[p * 4] + 0.59 * col[p * 4 + 1] + 0.11 * col[p * 4 + 2];
       // part of the gem if it's coloured, OR inside the gem's shape (so white highlights and bright pearl sides count too)
-      const insideShape = smoothGem ? d <= 0.97 : Math.hypot(x - half, y - half) <= smoothOutline[k];
+      const insideShape = smoothGem ? Math.hypot(x - half, y - half) <= roundR : Math.hypot(x - half, y - half) <= smoothOutline[k];
       // the gem is its outline, minus any blank (paper-white) band right at the edge, so no flat ring covers the paper texture.
       // Deeper inside, white highlights still count as gem.
       const rimZone = smoothGem ? d > 0.8 : Math.hypot(x - half, y - half) > smoothOutline[k] - 3;
@@ -137,9 +152,9 @@ async function makeFacetSprites() {
       const shadowy = !smoothGem && flat[p] && chroma < 20 && distC > smoothOutline[k] - r * 0.14;
       mask[p] = insideShape && (!rimZone || 255 - mn > 14) && !shadowy ? 1 : 0;
       // partial coverage across the last pixel of the outline (anti-aliasing)
-      const edgeCov = smoothGem ? (0.97 * r - distC) + 0.5 : (smoothOutline[k] - distC) + 0.5;
+      const edgeCov = smoothGem ? (roundR - distC) + 0.5 : (smoothOutline[k] - distC) + 0.5;
       cov[p] = mask[p] ? Math.min(1, Math.max(0, edgeCov)) : 0;
-      const band = smoothGem ? r * 0.16 : Math.max(3, r * 0.16);
+      const band = smoothGem ? -1 : 2.5;   // pearls: the whole circle is solid; others: only the last couple of pixels can turn see-through
       core[p] = mask[p] ? Math.min(1, Math.max(0, (edgeCov - band) / 2)) : 0;
     }
 
@@ -148,7 +163,12 @@ async function makeFacetSprites() {
     // (grow the shape by a few pixels, then shrink it back: holes close, the points stay sharp)
     if (/Star/.test(name)) {
       const ink = (q) => 255 - Math.min(col[q * 4], col[q * 4 + 1], col[q * 4 + 2]);
-      const m0 = new Uint8Array(N); for (let q = 0; q < N; q++) m0[q] = ink(q) > 22 ? 1 : 0;
+      const m0 = new Uint8Array(N);
+      for (let q = 0; q < N; q++) {
+        const R = col[q * 4], G = col[q * 4 + 1], B = col[q * 4 + 2];
+        const grey = Math.max(R, G, B) - Math.min(R, G, B) < 14 && flat[q];   // flat colourless = shadow, not crystal
+        m0[q] = ink(q) > 22 && !grey ? 1 : 0;
+      }
       const R = Math.max(2, Math.round(size / 70));
       const morph = (src, grow) => {
         const out = new Uint8Array(N);
@@ -240,14 +260,14 @@ async function makeFacetSprites() {
 
     const toCanvas = (data) => { const c = document.createElement("canvas"); c.width = size; c.height = size; c.getContext("2d").putImageData(new ImageData(data, size, size), 0, 0); return c; };
     if (/Star/.test(name)) {
-      const E = Math.max(3, Math.round(size / 40));
+      const E = 2;
       for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
         let all = 1;
         for (let dy = -E; dy <= E && all; dy += E) for (let dx = -E; dx <= E; dx += E) {
           const xx = x + dx, yy = y + dy;
           if (xx < 0 || yy < 0 || xx >= size || yy >= size || !mask[yy * size + xx]) { all = 0; break; }
         }
-        core[y * size + x] = all;
+        core[y * size + x] = all;   // (stars: E is a few px)
       }
     }
     // soften the coverage by one pixel so even the stars' and petals' edges are smooth
@@ -336,7 +356,7 @@ function makeFacetRenderer(canvas) {
       vec4 base = texture2D(colorTex, guv);
       vec4 nm = texture2D(normalTex, guv);
       vec2 cvt = texture2D(coverTex, guv).rg;
-      float ink = smoothstep(.03, .16, 1. - min(base.r, min(base.g, base.b)));
+      float ink = smoothstep(.012, .07, 1. - min(base.r, min(base.g, base.b)));
       float cover = cvt.r * max(ink, cvt.g);   // plain white near the edge is see-through, so the real paper shows
       if (cover < .004) { gl_FragColor = vec4(0.); return; }   // outside the gem: fully transparent
       vec2 nxy = nm.rg * 2. - 1.;
