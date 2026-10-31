@@ -144,7 +144,8 @@
   header { align-items: center; }
   @media (max-width: 700px) {
     body.links-top header .right #clock, body.links-top header .where { display: none; }   /* phones: no room for the time too */
-    header .links { gap: 12px; }
+    header .links { gap: 12px; position: static; transform: none; margin-left: auto; }   /* phones: links sit top-right */
+    body.links-top header .right { display: none; }
   }
   /* text in the links row that isn't a link (the written-out email) */
   .links .plain { color: var(--muted); text-transform: none; letter-spacing: .03em; }
