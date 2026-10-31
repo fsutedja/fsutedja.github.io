@@ -160,6 +160,12 @@
     header .links .plain { display: none; }                         /* phones: too long for the top bar… */
     .email-line { display: block; margin-top: 7px; color: var(--muted); font-size: 11px; letter-spacing: .03em; text-transform: none; }  /* …so it sits under the tagline */
   }
+  /* interactive title */
+  #greeting .ch { display: inline-block; will-change: transform; }
+  body.text-sheen #greeting { background: radial-gradient(circle 150px at var(--mx, -999px) var(--my, -999px),
+        #e8a9bb 0%, #c9a6e0 22%, #9fd3d6 38%, #3a3433 62%) var(--ink); -webkit-background-clip: text; background-clip: text; color: transparent;
+        padding: .12em .05em .25em; margin: -.12em -.05em -.25em; }   /* room for the y's tail and the apostrophe */
+  body.text-sheen #greeting i { color: transparent; }
 </style>
 
 </head>
@@ -207,6 +213,57 @@
 const $ = s => document.querySelector(s);
 const linkList = links => links.map(l => !l.url ? `<span class="plain">${l.label}</span>` : l.url.startsWith("mailto:") ? `<a href="${l.url}">${l.label}</a>` : `<a href="${l.url}" target="_blank" rel="noopener">${l.label}</a>`).join("");
 $("#greeting").innerHTML = intro.greeting; // allows the italic F
+
+/* ---------- interactive title (trying out: ?text=sheen | lift | press) ----------
+   Each letter becomes its own little piece, so it can react to how close the cursor (or finger) is. */
+const textFx = new URLSearchParams(location.search).get("text") || "lift";   // "lift" = chosen
+if (textFx && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+  const h1 = $("#greeting");
+  const split = (node) => {
+    for (const child of [...node.childNodes]) {
+      if (child.nodeType === 3) {
+        const frag = document.createDocumentFragment();
+        for (const ch of child.textContent) {
+          const sp = document.createElement("span"); sp.className = "ch"; sp.textContent = ch;
+          if (ch === " ") sp.style.whiteSpace = "pre";
+          frag.appendChild(sp);
+        }
+        child.replaceWith(frag);
+      } else split(child);
+    }
+  };
+  if (textFx !== "sheen") split(h1);   // the sheen colours the whole title at once, so it doesn't need separate letters
+  document.body.classList.add("text-" + textFx);
+  const letters = [...h1.querySelectorAll(".ch")];
+  let px = -9999, py = -9999;
+  addEventListener("pointermove", (e) => { px = e.clientX; py = e.clientY; });
+  addEventListener("pointerdown", (e) => { px = e.clientX; py = e.clientY; });
+  addEventListener("pointerup", (e) => { if (e.pointerType !== "mouse") { px = py = -9999; } });
+  document.addEventListener("pointerleave", () => { px = py = -9999; });
+  const state = letters.map(() => 0);
+  (function tick() {
+    const box = h1.getBoundingClientRect();
+    if (textFx === "sheen") {
+      // the "ink" picks up a pearly shimmer around the cursor
+      h1.style.setProperty("--mx", (px - box.left) + "px");
+      h1.style.setProperty("--my", (py - box.top) + "px");
+    } else {
+      letters.forEach((el, i) => {
+        const r = el.getBoundingClientRect();
+        const d = Math.hypot(px - (r.left + r.width / 2), py - (r.top + r.height / 2));
+        const want = Math.exp(-(d * d) / (2 * 95 * 95));          // 1 right under the cursor, fading out ~200px away
+        state[i] += (want - state[i]) * 0.14;                        // eased, so it feels soft
+        const k = state[i];
+        if (textFx === "lift") el.style.transform = `translateY(${(-k * 9).toFixed(2)}px) rotate(${(Math.sin(i * 1.7) * k * 4).toFixed(2)}deg)`;
+        if (textFx === "press") {
+          const italic = !!el.closest("i");
+          el.style.fontVariationSettings = `"wght" ${(440 + k * 190).toFixed(0)}, "SOFT" 100, "WONK" ${italic ? 1 : 0}, "opsz" 144`;
+        }
+      });
+    }
+    requestAnimationFrame(tick);
+  })();
+}
 /* the tagline types itself out, letter by letter, with a blinking cursor.
    The not-yet-typed letters are already there but invisible, so nothing on the page shifts while it types. */
 function typeTagline(text) {
