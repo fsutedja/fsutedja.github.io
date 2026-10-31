@@ -111,6 +111,7 @@ async function makeFacetSprites() {
       return v.sort((m, n) => m - n)[2];
     };
     const smoothOutline = Float32Array.from({ length: DIRS }, (_, k) => outlineAt(k));
+    const cov = new Float32Array(N);   // how much of each pixel is gem (0–1): gives smooth, non-jagged edges
     for (let p = 0; p < N; p++) {
       const x = p % size, y = (p / size) | 0, d = Math.hypot(x - half, y - half) / r;
       const R = col[p * 4], G = col[p * 4 + 1], B = col[p * 4 + 2];
@@ -130,7 +131,13 @@ async function makeFacetSprites() {
       // the gem is its outline, minus any blank (paper-white) band right at the edge, so no flat ring covers the paper texture.
       // Deeper inside, white highlights still count as gem.
       const rimZone = smoothGem ? d > 0.8 : Math.hypot(x - half, y - half) > smoothOutline[k] - 3;
-      mask[p] = insideShape && (!rimZone || 255 - mn > 14) ? 1 : 0;
+      // flat, grey, colourless patches near the edge are the photo's shadow, not gem
+      const distC = Math.hypot(x - half, y - half);
+      const shadowy = !smoothGem && flat[p] && chroma < 20 && distC > smoothOutline[k] - r * 0.14;
+      mask[p] = insideShape && (!rimZone || 255 - mn > 14) && !shadowy ? 1 : 0;
+      // partial coverage across the last pixel of the outline (anti-aliasing)
+      const edgeCov = smoothGem ? (0.97 * r - distC) + 0.5 : (smoothOutline[k] - distC) + 0.5;
+      cov[p] = mask[p] ? Math.min(1, Math.max(0, edgeCov)) : 0;
     }
 
     // stars: measuring "inside" outward from the centre wrongly fills the gaps between the points,
@@ -156,7 +163,7 @@ async function makeFacetSprites() {
       };
       const closed = morph(morph(m0, true), false);
       for (let q = 0; q < N; q++) {
-        mask[q] = closed[q];
+        mask[q] = closed[q]; cov[q] = closed[q];
         // whatever isn't part of the star becomes pure white (so it disappears completely)
         if (!closed[q]) { col[q * 4] = col[q * 4 + 1] = col[q * 4 + 2] = 255; }
       }
@@ -229,7 +236,18 @@ async function makeFacetSprites() {
     for (let p = 0; p < N; p++) if (!mask[p]) nrm[p * 4 + 3] = 0;
 
     const toCanvas = (data) => { const c = document.createElement("canvas"); c.width = size; c.height = size; c.getContext("2d").putImageData(new ImageData(data, size, size), 0, 0); return c; };
-    out[name] = { color: toCanvas(col), normals: toCanvas(nrm), half, r, smooth: SMOOTH.test(name), rainbow: RAINBOW.test(name) };
+    // soften the coverage by one pixel so even the stars' and petals' edges are smooth
+    const cv = new Uint8ClampedArray(N * 4);
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+      let sum = 0, w = 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= size || yy >= size) continue;
+        const wt = dx || dy ? (dx && dy ? 0.5 : 1) : 2; sum += cov[yy * size + xx] * wt; w += wt;
+      }
+      const v = Math.min(cov[y * size + x] > 0 ? 1 : 0.999, sum / w) * 255, q = (y * size + x) * 4;
+      cv[q] = cv[q + 1] = cv[q + 2] = v; cv[q + 3] = 255;
+    }
+    out[name] = { color: toCanvas(col), normals: toCanvas(nrm), cover: toCanvas(cv), half, r, smooth: SMOOTH.test(name), rainbow: RAINBOW.test(name) };
   }
   return out;
 }
@@ -264,7 +282,7 @@ function makeFacetRenderer(canvas) {
   const FS = `
     precision highp float;   // must match the vertex shader, since they share uniforms
     varying vec2 uv;
-    uniform sampler2D colorTex, normalTex;
+    uniform sampler2D colorTex, normalTex, coverTex;
     uniform vec2 center, lightPos, view; uniform float rot, near, smoothGem, rainbow, time;
     // the knobs from the tuning panel (see TUNING below)
     uniform float uLift, uFlash, uGain, uPastel, uSat, uRainbow, uLamp, uView, uBright, uContrast, uShadow, uShadowSoft, uShadowDist;
@@ -301,7 +319,8 @@ function makeFacetRenderer(canvas) {
 
       vec4 base = texture2D(colorTex, guv);
       vec4 nm = texture2D(normalTex, guv);
-      if (nm.a < .02) { gl_FragColor = vec4(0.); return; }   // outside the gem: fully transparent
+      float cover = texture2D(coverTex, guv).r;
+      if (cover < .004) { gl_FragColor = vec4(0.); return; }   // outside the gem: fully transparent
       vec2 nxy = nm.rg * 2. - 1.;
       vec3 n = vec3(nxy, sqrt(max(0., 1. - dot(nxy, nxy))));
       // everything below is turned into the gem's own (rotated) frame, because that's how its facets were measured
@@ -345,7 +364,7 @@ function makeFacetRenderer(canvas) {
       c = mix(c, vec3(1.), uPastel * solid * (1. - smoothGem * .8));
       c = mix(c, c * uBright, solid);
       // coverage comes from the gem's (smoothly filtered) outline, so the edge is a soft, even fade, not a dotted line
-      gl_FragColor = onPaper(min(c, vec3(1.)), base.rgb, smoothstep(.2, .8, nm.a));
+      gl_FragColor = onPaper(min(c, vec3(1.)), base.rgb, cover);
     }`;
   const sh = (t, s) => { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(o)); return o; };
   const prog = gl.createProgram();
@@ -353,8 +372,8 @@ function makeFacetRenderer(canvas) {
   gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
   const loc = gl.getAttribLocation(prog, "corner"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-  const U = {}; ["res", "center", "size", "rot", "colorTex", "normalTex", "lightPos", "near", "smoothGem", "rainbow", "time", "view", "uLift", "uFlash", "uGain", "uPastel", "uSat", "uRainbow", "uLamp", "uView", "uBright", "uContrast", "uShadow", "uShadowSoft", "uShadowDist", "shadowPass", "pad"].forEach((n) => (U[n] = gl.getUniformLocation(prog, n)));
-  gl.uniform1i(U.colorTex, 0); gl.uniform1i(U.normalTex, 1);
+  const U = {}; ["res", "center", "size", "rot", "colorTex", "normalTex", "coverTex", "lightPos", "near", "smoothGem", "rainbow", "time", "view", "uLift", "uFlash", "uGain", "uPastel", "uSat", "uRainbow", "uLamp", "uView", "uBright", "uContrast", "uShadow", "uShadowSoft", "uShadowDist", "shadowPass", "pad"].forEach((n) => (U[n] = gl.getUniformLocation(prog, n)));
+  gl.uniform1i(U.colorTex, 0); gl.uniform1i(U.normalTex, 1); gl.uniform1i(U.coverTex, 2);
   // gems are drawn as solid objects with soft edges, layered normally over the page
   gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
@@ -400,6 +419,7 @@ function makeFacetRenderer(canvas) {
         for (const it of items) {
           gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex(it.sprite.color));
           gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, ntex(it.sprite.normals));
+          gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, tex(it.sprite.cover));
           gl.uniform2f(U.center, it.x * dpr, it.y * dpr); gl.uniform1f(U.size, it.size * dpr * (pass ? PAD : 1)); gl.uniform1f(U.rot, it.rot);
           gl.uniform2f(U.lightPos, it.light.x * dpr, it.light.y * dpr); gl.uniform1f(U.near, it.near);
           gl.uniform1f(U.smoothGem, it.sprite.smooth ? 1 : 0); gl.uniform1f(U.rainbow, it.sprite.rainbow ? 1 : 0);
