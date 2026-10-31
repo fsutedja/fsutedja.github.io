@@ -11,7 +11,9 @@
           --display: "Fraunces", serif; --text: "Fraunces", serif; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; }
-  body { background: var(--bg); color: var(--ink); font-family: var(--text); overflow: hidden; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--text); overflow-x: hidden; }
+  /* each part of the page is one full screen (svh = the visible screen height on phones) */
+  .screen { position: relative; height: 100vh; height: 100svh; }
   a { color: inherit; }
   .mono { font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: .07em; text-transform: uppercase; }
 
@@ -46,7 +48,7 @@
   .glint::after { width: 62%; transform: translate(-50%, -50%) rotate(calc(var(--r, 0deg) + 90deg)); }
 
   header { position: fixed; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; padding: 22px 4vw; color: var(--muted); z-index: 5; pointer-events: none; }
-  .hello { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(var(--fit, 1)); width: 760px; text-align: center; z-index: 3; transition: opacity .5s; }
+  .hello { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(var(--fit, 1)); width: 760px; text-align: center; z-index: 3; transition: opacity .5s; }
   body.open .hello { opacity: 0; pointer-events: none; }
   /* the italic F in the title: same font and weight, just its real italic */
   /* title (draft B): upright "hi, i’m" + italic "Freya", both Fraunces at weight 440 */
@@ -122,6 +124,11 @@
     .panel { padding: 64px 24px 40px; }
     .panel .back { left: 24px; }
   }
+  .exit-try { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 60; display: none; gap: 4px; padding: 4px;
+              background: rgba(248,246,242,.9); border: 1px solid #cfc6bd; border-radius: 999px; font: 11px "IBM Plex Mono", monospace; }
+  body.try .exit-try { display: flex; }
+  .exit-try button { font: inherit; background: none; border: 1px solid transparent; border-radius: 999px; padding: 5px 11px; cursor: pointer; color: #3a3433; }
+  .exit-try button.on { border-color: #3a3433; }
 </style>
 
 </head>
@@ -129,12 +136,19 @@
 <div class="field" id="field"></div>
 <header class="mono"><span>freya sutedja</span><span><span class="where">berkeley, ca · </span><span id="clock"></span></span></header>
 
-<div class="hello" id="hello">
-  <h1 id="greeting"></h1>
-  <p class="mono tag" id="tagline"></p>
-  <nav class="links mono" id="links"></nav>
-</div>
+<main>
+  <section class="screen" id="intro">
+    <div class="hello" id="hello">
+      <h1 id="greeting"></h1>
+      <p class="mono tag" id="tagline"></p>
+      <nav class="links mono" id="links"></nav>
+    </div>
+  </section>
+  <!-- the next screen: empty for now -->
+  <section class="screen" id="next"></section>
+</main>
 <div class="label" id="label"></div>
+<nav class="exit-try" id="exit-try"></nav>
 
 <aside class="panel" id="panel">
   <button class="back mono" id="back">← back</button>
@@ -155,7 +169,7 @@
 <script src="js/content.js?v=1793407224"></script>
 <script>window.GEM_SHEET = "images/gem-sheet.png";</script>
 <script src="js/gems.js?v=1793406696"></script>
-<script src="js/facets.js?v=1793409114"></script>
+<script src="js/facets.js?v=1793409388"></script>
 <script>
 const $ = s => document.querySelector(s);
 const linkList = links => links.map(l => l.url.startsWith("mailto:") ? `<a href="${l.url}">${l.label}</a>` : `<a href="${l.url}" target="_blank" rel="noopener">${l.label}</a>`).join("");
@@ -199,7 +213,14 @@ function build() {
 }
 // wait for the fonts too, so the words are measured at their real size
 Promise.all([makeFacetSprites(), document.fonts.ready]).then(([s]) => { sprites = s; build(); });
-let resizeTimer; addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(build, 150); });
+let resizeTimer, lastW = innerWidth;
+addEventListener("resize", () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    if (innerWidth === lastW) { renderer.resize(innerWidth, innerHeight); return; } // only the height changed (phone address bar)
+    lastW = innerWidth; build();
+  }, 150);
+});
 
 /* motion + living light */
 let mouse = null;
@@ -229,6 +250,50 @@ if ("DeviceOrientationEvent" in window) {
   } else addEventListener("deviceorientation", onTilt);
 }
 
+/* ---------- how the gems leave when you scroll down ----------
+   p = how far you've scrolled through the first screen (0 = top, 1 = one screen down).
+   Each gem starts its exit at a slightly different moment (its "stagger"), so they don't move as one sheet.
+   Scrolling back up plays it in reverse. */
+const EXITS = {
+  scatter: "scatter",   // burst outward from the centre, spinning, and fade
+  fall:    "fall",      // tumble down off the page as if the paper tipped
+  swirl:   "swirl",     // spiral into the middle and vanish
+  twinkle: "twinkle",   // each one sparkles, then shrinks away
+};
+let exitStyle = new URLSearchParams(location.search).get("exit") || "scatter";
+const ease = (x) => x < 0 ? 0 : x > 1 ? 1 : x * x * (3 - 2 * x);
+function exitPose(g, x, y, size, rot, p) {
+  const W = innerWidth, H = innerHeight, cx = W / 2, cy = H / 2;
+  const t = ease((p - g.stagger) / 0.55);              // this gem's own progress, 0 → 1
+  if (t <= 0) return { x, y, size, rot, alpha: 1, flash: 0 };
+  const dx = x - cx, dy = y - cy, dist = Math.hypot(dx, dy) || 1;
+  if (exitStyle === "scatter") {
+    const go = t * t * Math.max(W, H) * 0.9;
+    return { x: x + dx / dist * go, y: y + dy / dist * go - t * 40, size: size * (1 + t * 0.25), rot: rot + t * g.spin * 3, alpha: 1 - t * t, flash: Math.sin(t * Math.PI) * 0.6 };
+  }
+  if (exitStyle === "fall") {
+    const drop = t * t * (H * 1.15 + 80);
+    return { x: x + Math.sin(t * 3 + g.phase) * 30 * t + g.spin * 40 * t, y: y + drop, size, rot: rot + t * g.spin * 5, alpha: 1, flash: 0 };
+  }
+  if (exitStyle === "swirl") {
+    const a = Math.atan2(dy, dx) + t * (2.2 + g.spin), r = dist * (1 - t);
+    return { x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r, size: size * (1 - t * 0.9), rot: rot + t * 6, alpha: 1 - Math.pow(t, 4), flash: t * 0.5 };
+  }
+  // twinkle: a bright flash, then it shrinks to nothing while turning
+  return { x, y: y - t * 12, size: size * (1 - ease((t - 0.25) / 0.75)), rot: rot + t * g.spin * 4, alpha: 1, flash: Math.sin(Math.min(1, t * 2) * Math.PI) * 1.4 };
+}
+
+// try-out buttons (open the site with ?try to see them)
+if (new URLSearchParams(location.search).has("try")) {
+  document.body.classList.add("try");
+  const nav = $("#exit-try");
+  nav.innerHTML = Object.keys(EXITS).map((k) => `<button data-k="${k}">${k}</button>`).join("");
+  const mark = () => nav.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.k === exitStyle));
+  nav.onclick = (e) => { const b = e.target.closest("button"); if (!b) return; exitStyle = b.dataset.k; mark();
+    const u = new URL(location); u.searchParams.set("exit", exitStyle); history.replaceState(null, "", u); };
+  mark();
+}
+
 let view = { x: 0, y: 0 };
 function frame(ms) {
   const t = ms / 1000, items = [];
@@ -238,7 +303,9 @@ function frame(ms) {
   view.x += (want.x - view.x) * .06; view.y += (want.y - view.y) * .06;
   // the light: your cursor; when it's away, a light slowly drifts around above the page
   const light = mouse || { x: innerWidth * (.5 + .42 * Math.cos(t * .23)), y: innerHeight * (.45 + .4 * Math.sin(t * .31)) };
+  const p = Math.max(0, Math.min(1.2, scrollY / innerHeight));   // scroll progress through the first screen
   gems.forEach((g) => {
+    if (g.stagger == null) { g.stagger = Math.random() * 0.35; g.spin = (Math.random() - 0.5) * 2; }
     // gentle drift, and sliding softly out of the cursor's way
     let tx = Math.sin(t * g.speed + g.phase) * g.amp, ty = Math.cos(t * g.speed * .8 + g.phase * 1.7) * g.amp;
     if (mouse) {
@@ -252,7 +319,9 @@ function frame(ms) {
     const rot = g.rot + Math.sin(t * g.speed * .7 + g.phase * 2) * 4 * Math.PI / 180;
     const d = Math.hypot(light.x - gx, light.y - gy);
     const near = Math.max(0, 1 - d / 420);                          // how strongly this gem is lit
-    items.push({ sprite: g.sp, x: gx, y: gy, size: g.size, rot, light, near });
+    const e = exitPose(g, gx, gy, g.size, rot, p);
+    if (e.alpha <= 0.01 || e.size < 0.5 || e.y > innerHeight + 200 || e.y < -200 || e.x < -200 || e.x > innerWidth + 200) return;
+    items.push({ sprite: g.sp, x: e.x, y: e.y, size: e.size, rot: e.rot, light, near: Math.min(1.6, near + e.flash), alpha: e.alpha });
 
   });
   renderer.draw(items, t, view);

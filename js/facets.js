@@ -322,7 +322,7 @@ function makeFacetRenderer(canvas) {
     uniform vec2 center, lightPos, view; uniform float rot, near, smoothGem, rainbow, time;
     // the knobs from the tuning panel (see TUNING below)
     uniform float uLift, uFlash, uGain, uPastel, uSat, uRainbow, uLamp, uView, uBright, uContrast, uShadow, uShadowSoft, uShadowDist;
-    uniform float shadowPass, pad;   // shadowPass: drawing the backdrop shadow; pad: the shadow's quad is bigger than the gem
+    uniform float shadowPass, pad, uAlpha;   // shadowPass: drawing the backdrop shadow; pad: the shadow's quad is bigger than the gem
     // Gems are drawn as solid things lying on the page (so a textured paper doesn't show through them).
     // On a plain page this gives exactly the same result as the old "multiply" look:
     //   coverage a = how far the pixel is from white; colour chosen so  a*colour + (1-a)*paper = paper*gem.
@@ -357,7 +357,7 @@ function makeFacetRenderer(canvas) {
       vec4 nm = texture2D(normalTex, guv);
       // how much of this pixel is gem: the smooth outline only. White parts of the picture don't need cutting out,
       // because the canvas multiplies onto the page: white x paper = exactly the paper underneath.
-      float cover = texture2D(coverTex, guv).r;
+      float cover = texture2D(coverTex, guv).r * uAlpha;   // uAlpha: fading out (scroll animation)
       if (cover < .004) { gl_FragColor = vec4(0.); return; }   // outside the gem: fully transparent
       vec2 nxy = nm.rg * 2. - 1.;
       vec3 n = vec3(nxy, sqrt(max(0., 1. - dot(nxy, nxy))));
@@ -413,7 +413,7 @@ function makeFacetRenderer(canvas) {
   gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
   const loc = gl.getAttribLocation(prog, "corner"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-  const U = {}; ["res", "center", "size", "rot", "colorTex", "normalTex", "coverTex", "lightPos", "near", "smoothGem", "rainbow", "time", "view", "uLift", "uFlash", "uGain", "uPastel", "uSat", "uRainbow", "uLamp", "uView", "uBright", "uContrast", "uShadow", "uShadowSoft", "uShadowDist", "shadowPass", "pad"].forEach((n) => (U[n] = gl.getUniformLocation(prog, n)));
+  const U = {}; ["res", "center", "size", "rot", "colorTex", "normalTex", "coverTex", "lightPos", "near", "smoothGem", "rainbow", "time", "view", "uLift", "uFlash", "uGain", "uPastel", "uSat", "uRainbow", "uLamp", "uView", "uBright", "uContrast", "uShadow", "uShadowSoft", "uShadowDist", "shadowPass", "pad", "uAlpha"].forEach((n) => (U[n] = gl.getUniformLocation(prog, n)));
   gl.uniform1i(U.colorTex, 0); gl.uniform1i(U.normalTex, 1); gl.uniform1i(U.coverTex, 2);
   // gems are drawn as solid objects with soft edges, layered normally over the page
   gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
@@ -463,6 +463,7 @@ function makeFacetRenderer(canvas) {
           gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, tex(it.sprite.cover));
           gl.uniform2f(U.center, it.x * dpr, it.y * dpr); gl.uniform1f(U.size, it.size * dpr * (pass ? PAD : 1)); gl.uniform1f(U.rot, it.rot);
           gl.uniform2f(U.lightPos, it.light.x * dpr, it.light.y * dpr); gl.uniform1f(U.near, it.near);
+          gl.uniform1f(U.uAlpha, it.alpha ?? 1);
           gl.uniform1f(U.smoothGem, it.sprite.smooth ? 1 : 0); gl.uniform1f(U.rainbow, it.sprite.rainbow ? 1 : 0);
           gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
         }
