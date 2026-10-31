@@ -218,10 +218,21 @@ function typeTagline(text) {
 typeTagline(intro.tagline);
 
 // where the links go: under the tagline (default), or in the top bar
+let gemsLeft = 1, textBox = null;
 // as you scroll, the title fades out before it reaches the top bar (so they never overlap)
 function fadeTitle() {
   const hello = $("#hello"), barBottom = $("#topbar").getBoundingClientRect().bottom;
   const top = hello.getBoundingClientRect().top;
+  // gems leave gradually from the moment you start scrolling, and finish exactly when the text is gone
+  const travel = Math.max(1, top + scrollY - barBottom + 12);          // how far the title moves before it's gone
+  gemsLeft = Math.max(0, Math.min(1, (top - barBottom + 12) / travel)); // 1 at the top of the page → 0 exactly when the text is gone
+  // the exact area the words cover right now (gems are kept out of it)
+  textBox = null;
+  for (const el of [$("#greeting"), $("#tagline")]) {
+    const r = document.createRange(); r.selectNodeContents(el); const b = r.getBoundingClientRect();
+    textBox = textBox ? { l: Math.min(textBox.l, b.left), r: Math.max(textBox.r, b.right), t: Math.min(textBox.t, b.top), b: Math.max(textBox.b, b.bottom) }
+                      : { l: b.left, r: b.right, t: b.top, b: b.bottom };
+  }
   const o = Math.max(0, Math.min(1, (top - barBottom + 12) / 110));   // fully gone just as it reaches the bar's text, starts fading ~100px before
   hello.style.opacity = o;
   hello.style.pointerEvents = o < 0.1 ? "none" : "";
@@ -273,7 +284,7 @@ function build() {
   });
 }
 // wait for the fonts too, so the words are measured at their real size
-Promise.all([makeFacetSprites(), document.fonts.ready]).then(([s]) => { sprites = s; build(); });
+Promise.all([makeFacetSprites(), document.fonts.ready]).then(([s]) => { sprites = s; build(); fadeTitle(); });
 let resizeTimer, lastW = innerWidth;
 addEventListener("resize", () => {
   clearTimeout(resizeTimer);
@@ -329,8 +340,8 @@ function exitPose(g, x, y, size, rot, p) {
   if (t <= 0) return { x, y, size, rot, alpha: 1, flash: 0 };
   const dx = x - cx, dy = y - cy, dist = Math.hypot(dx, dy) || 1;
   if (exitStyle === "scatter") {
-    const go = t * t * Math.max(W, H) * 0.9;
-    return { x: x + dx / dist * go, y: y + dy / dist * go - t * 40, size: size * (1 + t * 0.25), rot: rot + t * g.spin * 3, alpha: 1 - t * t, flash: Math.sin(t * Math.PI) * 0.6 };
+    const go = t * t * t * Math.max(W, H) * 0.75;
+    return { x: x + dx / dist * go, y: y + dy / dist * go - t * 40, size: size * (1 + t * 0.25), rot: rot + t * g.spin * 3, alpha: 1 - t * t * t, flash: Math.sin(t * Math.PI) * 0.6 };
   }
   if (exitStyle === "fall") {
     const drop = t * t * (H * 1.15 + 80);
@@ -364,8 +375,8 @@ function frame(ms) {
   view.x += (want.x - view.x) * .06; view.y += (want.y - view.y) * .06;
   // the light: your cursor; when it's away, a light slowly drifts around above the page
   const light = mouse || { x: innerWidth * (.5 + .42 * Math.cos(t * .23)), y: innerHeight * (.45 + .4 * Math.sin(t * .31)) };
-  // scroll progress: gems are gone after ~70% of a screen on phones, ~60% on bigger screens
-  const p = Math.max(0, Math.min(1.2, scrollY / (innerHeight * (innerWidth <= 700 ? 0.7 : 0.6))));
+  // scroll progress, timed to the title: at p = 0.9 every gem has left, which is exactly when the text is gone
+  const p = 0.9 * Math.pow(1 - gemsLeft, 1.7) + (scrollY > innerHeight ? 0.3 : 0);   // slow start, quicker finish
   gems.forEach((g) => {
     if (g.stagger == null) { g.stagger = Math.random() * 0.3; g.spin = (Math.random() - 0.5) * 2; }
     // gentle drift, and sliding softly out of the cursor's way
@@ -382,6 +393,13 @@ function frame(ms) {
     const d = Math.hypot(light.x - gx, light.y - gy);
     const near = Math.max(0, 1 - d / 420);                          // how strongly this gem is lit
     const e = exitPose(g, gx, gy, g.size, rot, p);
+    // keep gems off the words: if one is in the way, it's nudged just outside the text (above or below)
+    if (textBox && gemsLeft > 0) {
+      const rad = g.r * (e.size / g.size) * 1.05 + 6;
+      if (e.x > textBox.l - rad && e.x < textBox.r + rad && e.y > textBox.t - rad && e.y < textBox.b + rad) {
+        e.y = e.y < (textBox.t + textBox.b) / 2 ? textBox.t - rad : textBox.b + rad;
+      }
+    }
     if (e.alpha <= 0.01 || e.size < 0.5 || e.y > innerHeight + 200 || e.y < -200 || e.x < -200 || e.x > innerWidth + 200) return;
     items.push({ sprite: g.sp, x: e.x, y: e.y, size: e.size, rot: e.rot, light, near: Math.min(1.6, near + e.flash), alpha: e.alpha });
 
