@@ -23,12 +23,7 @@
            background-color: var(--bg);
            /* one even paper colour (no light-to-dark gradient) */ }
   /* paper: the "tooth" is noise lit from the top-left (tiny bumps catch the light), plus faint fibres */
-  .paper { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: overlay; opacity: var(--paper, .35); /* overlay: bumps lighten AND darken, so the paper keeps its colour */
-           background-image:
-             url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='900' height='900'><filter id='p' x='0' y='0' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='.05' numOctaves='5' seed='4' stitchTiles='stitch' result='n'/><feDiffuseLighting in='n' lighting-color='%23fffdf9' surfaceScale='4.6' diffuseConstant='1.0'><feDistantLight azimuth='225' elevation='38'/></feDiffuseLighting></filter><rect width='100%' height='100%' filter='url(%23p)'/></svg>"),
-             url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='500' height='500'><filter id='q' x='0' y='0' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='.22' numOctaves='3' seed='11' stitchTiles='stitch' result='n'/><feDiffuseLighting in='n' lighting-color='%23ffffff' surfaceScale='1.5' diffuseConstant='1.12'><feDistantLight azimuth='225' elevation='48'/></feDiffuseLighting></filter><rect width='100%' height='100%' filter='url(%23q)'/></svg>"),
-             url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><filter id='f'><feTurbulence type='fractalNoise' baseFrequency='.018 .1' numOctaves='2' seed='8' stitchTiles='stitch'/><feColorMatrix values='.06 0 0 0 .955  .06 0 0 0 .952  .06 0 0 0 .948  0 0 0 0 1'/></filter><rect width='100%' height='100%' filter='url(%23f)'/></svg>");
-           background-blend-mode: multiply; }
+  /* paper texture: baked once into a single image at load (see bakePaper below), so phones don't re-blend it every frame */
   body.open .field { opacity: .3; filter: blur(2px); }
   .gem { position: absolute; transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, 0px))) rotate(calc(var(--rot, 0rad) + var(--sway, 0deg))) scale(var(--s, 1)); background-size: 100% 100%;
          mix-blend-mode: multiply; filter: hue-rotate(var(--hue, 0deg)) saturate(var(--sat, 1)) brightness(var(--b, 1)); }
@@ -55,7 +50,7 @@
   .hello h1#greeting { font-weight: 440 !important; font-variation-settings: "SOFT" 100, "WONK" 0, "opsz" 144 !important; letter-spacing: -0.025em; }
   .hello h1 i { font-style: italic; font-weight: 440; font-variation-settings: "SOFT" 100, "WONK" 1, "opsz" 144; }
   .hello h1 { font-family: var(--display); font-weight: 400; font-size: 104px; line-height: 1; letter-spacing: -0.02em; white-space: nowrap; }
-  .hello .tag { margin-top: 26px; color: var(--soft); text-transform: none; font-size: 13px; letter-spacing: .06em; }
+  .hello .tag { margin-top: 26px; color: var(--soft); text-transform: none; font-size: max(13px, calc(11px / var(--fit, 1))); letter-spacing: .06em; }
   .hello .links { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
   .hello .links { margin-top: 18px; }
   .hello .links a { text-decoration: none; border-bottom: 1px solid var(--line); padding-bottom: 2px; }
@@ -152,7 +147,7 @@
   .email-line { display: none; }
   /* email placement on laptops (trying out: ?email=below or ?email=bottom) */
   body.email-below header .links .plain, body.email-bottom header .links .plain { display: none; }
-  body.email-below .email-line { display: block; margin-top: 8px; color: var(--muted); font-size: 12px; letter-spacing: .04em; text-transform: none; }
+  body.email-below .email-line { display: block; margin-top: 8px; color: var(--muted); font-size: max(12px, calc(10.5px / var(--fit, 1))); letter-spacing: .04em; text-transform: none; }
   .email-bottom-line { display: none; position: absolute; left: 0; right: 0; bottom: 26px; text-align: center; color: var(--muted);
                        font-size: 11px; letter-spacing: .05em; text-transform: none; z-index: 3; }
   body.email-bottom .email-bottom-line { display: block; }
@@ -205,10 +200,10 @@
 </div>
 
 <script>if (new URLSearchParams(location.search).has("tune")) document.body.classList.add("tune");</script>
-<script src="js/content.js?v=1793423110"></script>
+<script src="js/content.js?v=1793426087"></script>
 <script>window.GEM_SHEET = "images/gem-sheet.png";</script>
-<script src="js/gems.js?v=1793424577"></script>
-<script src="js/facets.js?v=1793422330"></script>
+<script src="js/gems.js?v=1793426087"></script>
+<script src="js/facets.js?v=1793426087"></script>
 <script>
 const $ = s => document.querySelector(s);
 const linkList = links => links.map(l => !l.url ? `<span class="plain">${l.label}</span>` : l.url.startsWith("mailto:") ? `<a href="${l.url}">${l.label}</a>` : `<a href="${l.url}" target="_blank" rel="noopener">${l.label}</a>`).join("");
@@ -241,6 +236,15 @@ if (textFx && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
   addEventListener("pointerup", (e) => { if (e.pointerType !== "mouse") { px = py = -9999; } });
   document.addEventListener("pointerleave", () => { px = py = -9999; });
   const state = letters.map(() => 0);
+  // letter centres, measured once relative to the title (re-measured on resize / font load), not every frame
+  let centres = [];
+  const measure = () => {
+    letters.forEach((el) => (el.style.transform = ""));
+    const b = h1.getBoundingClientRect();
+    centres = letters.map((el) => { const r = el.getBoundingClientRect(); return [r.left + r.width / 2 - b.left, r.top + r.height / 2 - b.top]; });
+  };
+  measure(); document.fonts.ready.then(measure); addEventListener("resize", measure);
+  let idle = false;
   (function tick() {
     const box = h1.getBoundingClientRect();
     if (textFx === "sheen") {
@@ -248,18 +252,25 @@ if (textFx && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
       h1.style.setProperty("--mx", (px - box.left) + "px");
       h1.style.setProperty("--my", (py - box.top) + "px");
     } else {
+      // nothing to do when no cursor/finger is near and every letter has settled
+      const near = px > box.left - 260 && px < box.right + 260 && py > box.top - 260 && py < box.bottom + 260;
+      if (!near && idle) { requestAnimationFrame(tick); return; }
+      let moving = false;
       letters.forEach((el, i) => {
-        const r = el.getBoundingClientRect();
-        const d = Math.hypot(px - (r.left + r.width / 2), py - (r.top + r.height / 2));
+        const c = centres[i] || [0, 0];
+        const d = Math.hypot(px - (box.left + c[0]), py - (box.top + c[1]));
         const want = Math.exp(-(d * d) / (2 * 95 * 95));          // 1 right under the cursor, fading out ~200px away
+        const before = state[i];
         state[i] += (want - state[i]) * 0.14;                        // eased, so it feels soft
-        const k = state[i];
+        if (Math.abs(state[i] - before) > 0.001 || state[i] > 0.002) moving = true;
+        const k = state[i] < 0.002 && want < 0.002 ? (state[i] = 0) : state[i];
         if (textFx === "lift") el.style.transform = `translateY(${(-k * 9).toFixed(2)}px) rotate(${(Math.sin(i * 1.7) * k * 4).toFixed(2)}deg)`;
         if (textFx === "press") {
           const italic = !!el.closest("i");
           el.style.fontVariationSettings = `"wght" ${(440 + k * 190).toFixed(0)}, "SOFT" 100, "WONK" ${italic ? 1 : 0}, "opsz" 144`;
         }
       });
+      idle = !moving;
     }
     requestAnimationFrame(tick);
   })();
@@ -308,7 +319,10 @@ function fadeTitle() {
     textBox = textBox ? { l: Math.min(textBox.l, b.left), r: Math.max(textBox.r, b.right), t: Math.min(textBox.t, b.top), b: Math.max(textBox.b, b.bottom) }
                       : { l: b.left, r: b.right, t: b.top, b: b.bottom };
   }
-  const o = Math.max(0, Math.min(1, (top - barBottom + 12) / 110));   // fully gone just as it reaches the bar's text, starts fading ~100px before
+  // the fade happens over the last ~110px before the bar, or over the whole distance if the screen is short,
+  // so the title is always fully visible before you start scrolling
+  const startGap = top + scrollY - barBottom + 12;
+  const o = Math.max(0, Math.min(1, (top - barBottom + 12) / Math.max(1, Math.min(110, startGap))));   // fully gone just as it reaches the bar's text, starts fading ~100px before
   hello.style.opacity = o;
   hello.style.pointerEvents = o < 0.1 ? "none" : "";
 }
@@ -333,6 +347,27 @@ const sections = [
 ];
 
 const field = $("#field");
+
+// bake the paper: the three texture layers are combined with the paper colour once, into one tile
+(function bakePaper() {
+  const TILE = 900, STRENGTH = 0.35;   // 0.35 = the paper texture level you chose
+  const layers = [
+    `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='900' height='900'><filter id='p' x='0' y='0' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='.05' numOctaves='5' seed='4' stitchTiles='stitch' result='n'/><feDiffuseLighting in='n' lighting-color='%23fffdf9' surfaceScale='4.6' diffuseConstant='1.0'><feDistantLight azimuth='225' elevation='38'/></feDiffuseLighting></filter><rect width='100%' height='100%' filter='url(%23p)'/></svg>`,
+    `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='900' height='900'><filter id='q' x='0' y='0' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='.22' numOctaves='3' seed='11' stitchTiles='stitch' result='n'/><feDiffuseLighting in='n' lighting-color='%23ffffff' surfaceScale='1.5' diffuseConstant='1.12'><feDistantLight azimuth='225' elevation='48'/></feDiffuseLighting></filter><rect width='100%' height='100%' filter='url(%23q)'/></svg>`,
+    `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='900' height='900'><filter id='f'><feTurbulence type='fractalNoise' baseFrequency='.018 .1' numOctaves='2' seed='8' stitchTiles='stitch'/><feColorMatrix values='.06 0 0 0 .955  .06 0 0 0 .952  .06 0 0 0 .948  0 0 0 0 1'/></filter><rect width='100%' height='100%' filter='url(%23f)'/></svg>`
+  ];
+  const c = document.createElement("canvas"); c.width = c.height = TILE; const x = c.getContext("2d");
+  x.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim() || "#f1eeea"; x.fillRect(0, 0, TILE, TILE);
+  // the first two layers (lit "tooth" + fine grain) are multiplied together, then overlaid on the paper colour
+  const tex = document.createElement("canvas"); tex.width = tex.height = TILE; const tx = tex.getContext("2d");
+  const load = (src) => new Promise((ok) => { const im = new Image(); im.onload = () => ok(im); im.onerror = () => ok(null); im.src = src; });
+  Promise.all(layers.map(load)).then(([a, b, f]) => {
+    if (!a) return;
+    tx.drawImage(a, 0, 0); tx.globalCompositeOperation = "multiply"; if (b) tx.drawImage(b, 0, 0); if (f) tx.drawImage(f, 0, 0);
+    x.globalCompositeOperation = "overlay"; x.globalAlpha = STRENGTH; x.drawImage(tex, 0, 0);
+    field.style.backgroundImage = `url(${c.toDataURL("image/png")})`;
+  });
+})();
 let sprites = null, gems = [], fit = 1;
 
 // one canvas holds all the gems; it multiplies onto the page so white disappears
@@ -345,14 +380,15 @@ function build() {
   const W = innerWidth, H = innerHeight;
   const phone = W <= 700;
   // desktop: the words shrink together on small windows. Phones size the words with CSS instead.
-  fit = phone ? 1 : Math.min(1, W / 1060, H / 640);
+  // how much the words shrink on smaller screens (tablets in portrait and phones held sideways shrink less than before)
+  fit = phone ? 1 : Math.min(1, W / 900, H / 560);
   $("#hello").style.setProperty("--fit", fit);
   // gem size: smaller on phones, but not tiny
-  const gemFit = phone ? Math.max(0.62, W / 620) : fit;
+  const gemFit = phone ? Math.max(0.62, W / 620) : Math.max(fit, H > W ? 0.88 : 0.7);   // tablets in portrait: gems not too small
   // keep gems clear of the actual words (measured, so it works at any size)
   const box = $("#hello").getBoundingClientRect();
   const quiet = { x: Math.max(box.width / 2 + 10, phone ? 0 : 380 * fit), y: Math.max(box.height / 2 + 26, phone ? 0 : 150 * fit) };
-  field.innerHTML = '<div class="paper"></div>'; field.appendChild(canvas); renderer.resize(W, H);
+  field.innerHTML = ""; field.appendChild(canvas); renderer.resize(W, H);
   gems = layoutGems(W, H, gemFit, sections, quiet).map((g) => {
     const sp = sprites[g.name], size = sp.half * 2 * (g.r / sp.r);
     return { ...g, sp, size, tw: 0, phase: Math.random() * 6, ox: 0, oy: 0, amp: (3 + Math.random() * 5) * gemFit, speed: .25 + Math.random() * .35 };
@@ -365,6 +401,7 @@ addEventListener("resize", () => {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
     if (innerWidth === lastW) { renderer.resize(innerWidth, innerHeight); return; } // only the height changed (phone address bar)
+    // (turning the device changes the width too, so it rebuilds below)
     lastW = innerWidth; build();
   }, 150);
 });
@@ -385,7 +422,12 @@ let tilt = null;
 function onTilt(e) {
   if (e.beta == null) return;
   // holding the phone upright-ish is "straight on"; leaning it left/right/forward moves the viewpoint
-  tilt = { x: Math.max(-1, Math.min(1, (e.gamma || 0) / 30)), y: Math.max(-1, Math.min(1, ((e.beta || 0) - 45) / 30)) };
+  // held sideways, the phone's axes swap, so read the tilt the right way round for the current orientation
+  const angle = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
+  let gx = e.gamma || 0, by = (e.beta || 0) - 45;
+  if (angle === 90) { gx = e.beta || 0; by = -(e.gamma || 0) - 45; }
+  else if (angle === -90 || angle === 270) { gx = -(e.beta || 0); by = (e.gamma || 0) - 45; }
+  tilt = { x: Math.max(-1, Math.min(1, gx / 30)), y: Math.max(-1, Math.min(1, by / 30)) };
 }
 if ("DeviceOrientationEvent" in window) {
   if (typeof DeviceOrientationEvent.requestPermission === "function") {

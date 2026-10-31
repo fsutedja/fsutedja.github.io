@@ -437,7 +437,7 @@ function makeFacetRenderer(canvas) {
 
   return {
     resize(w, h) {
-      const dpr = Math.min(devicePixelRatio || 1, 3);
+      const dpr = Math.min(devicePixelRatio || 1, 2);   // 2x is sharp enough on phones and far lighter than 3x
       canvas.width = w * dpr; canvas.height = h * dpr; canvas.style.width = w + "px"; canvas.style.height = h + "px";
       gl.viewport(0, 0, canvas.width, canvas.height); this.dpr = dpr;
     },
