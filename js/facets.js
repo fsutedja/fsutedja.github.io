@@ -112,6 +112,7 @@ async function makeFacetSprites() {
     };
     const smoothOutline = Float32Array.from({ length: DIRS }, (_, k) => outlineAt(k));
     const cov = new Float32Array(N);   // how much of each pixel is gem (0–1): gives smooth, non-jagged edges
+    const core = new Float32Array(N);  // the inner part of the gem, where even white highlights stay solid
     for (let p = 0; p < N; p++) {
       const x = p % size, y = (p / size) | 0, d = Math.hypot(x - half, y - half) / r;
       const R = col[p * 4], G = col[p * 4 + 1], B = col[p * 4 + 2];
@@ -138,6 +139,8 @@ async function makeFacetSprites() {
       // partial coverage across the last pixel of the outline (anti-aliasing)
       const edgeCov = smoothGem ? (0.97 * r - distC) + 0.5 : (smoothOutline[k] - distC) + 0.5;
       cov[p] = mask[p] ? Math.min(1, Math.max(0, edgeCov)) : 0;
+      const band = smoothGem ? r * 0.16 : Math.max(3, r * 0.16);
+      core[p] = mask[p] ? Math.min(1, Math.max(0, (edgeCov - band) / 2)) : 0;
     }
 
     // stars: measuring "inside" outward from the centre wrongly fills the gaps between the points,
@@ -163,7 +166,7 @@ async function makeFacetSprites() {
       };
       const closed = morph(morph(m0, true), false);
       for (let q = 0; q < N; q++) {
-        mask[q] = closed[q]; cov[q] = closed[q];
+        mask[q] = closed[q]; cov[q] = closed[q]; core[q] = 0;
         // whatever isn't part of the star becomes pure white (so it disappears completely)
         if (!closed[q]) { col[q * 4] = col[q * 4 + 1] = col[q * 4 + 2] = 255; }
       }
@@ -236,16 +239,29 @@ async function makeFacetSprites() {
     for (let p = 0; p < N; p++) if (!mask[p]) nrm[p * 4 + 3] = 0;
 
     const toCanvas = (data) => { const c = document.createElement("canvas"); c.width = size; c.height = size; c.getContext("2d").putImageData(new ImageData(data, size, size), 0, 0); return c; };
+    if (/Star/.test(name)) {
+      const E = Math.max(3, Math.round(size / 40));
+      for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+        let all = 1;
+        for (let dy = -E; dy <= E && all; dy += E) for (let dx = -E; dx <= E; dx += E) {
+          const xx = x + dx, yy = y + dy;
+          if (xx < 0 || yy < 0 || xx >= size || yy >= size || !mask[yy * size + xx]) { all = 0; break; }
+        }
+        core[y * size + x] = all;
+      }
+    }
     // soften the coverage by one pixel so even the stars' and petals' edges are smooth
     const cv = new Uint8ClampedArray(N * 4);
     for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
-      let sum = 0, w = 0;
+      let sum = 0, sumC = 0, w = 0;
       for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
         const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= size || yy >= size) continue;
-        const wt = dx || dy ? (dx && dy ? 0.5 : 1) : 2; sum += cov[yy * size + xx] * wt; w += wt;
+        const wt = dx || dy ? (dx && dy ? 0.5 : 1) : 2; sum += cov[yy * size + xx] * wt; sumC += core[yy * size + xx] * wt; w += wt;
       }
-      const v = Math.min(cov[y * size + x] > 0 ? 1 : 0.999, sum / w) * 255, q = (y * size + x) * 4;
-      cv[q] = cv[q + 1] = cv[q + 2] = v; cv[q + 3] = 255;
+      const q = (y * size + x) * 4;
+      cv[q] = Math.min(cov[y * size + x] > 0 ? 1 : 0.999, sum / w) * 255;   // red = outline coverage
+      cv[q + 1] = (sumC / w) * 255;                                          // green = solid core
+      cv[q + 2] = 0; cv[q + 3] = 255;
     }
     out[name] = { color: toCanvas(col), normals: toCanvas(nrm), cover: toCanvas(cv), half, r, smooth: SMOOTH.test(name), rainbow: RAINBOW.test(name) };
   }
@@ -319,7 +335,9 @@ function makeFacetRenderer(canvas) {
 
       vec4 base = texture2D(colorTex, guv);
       vec4 nm = texture2D(normalTex, guv);
-      float cover = texture2D(coverTex, guv).r;
+      vec2 cvt = texture2D(coverTex, guv).rg;
+      float ink = smoothstep(.03, .16, 1. - min(base.r, min(base.g, base.b)));
+      float cover = cvt.r * max(ink, cvt.g);   // plain white near the edge is see-through, so the real paper shows
       if (cover < .004) { gl_FragColor = vec4(0.); return; }   // outside the gem: fully transparent
       vec2 nxy = nm.rg * 2. - 1.;
       vec3 n = vec3(nxy, sqrt(max(0., 1. - dot(nxy, nxy))));
