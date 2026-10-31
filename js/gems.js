@@ -81,7 +81,7 @@ function rng(seed) { return () => { seed |= 0; seed = (seed + 0x6d2b79f5) | 0; l
 // sizes on screen (radius in px) for a 1440-wide window; scaled for smaller screens
 const SIZES = { big: [26, 34], medium: [15, 22], small: [7, 10], section: 30 };
 
-function layoutGems(W, H, fit, sectionGems) {
+function layoutGems(W, H, fit, sectionGems, quiet) {
   // a fresh, random arrangement on every visit (it stays the same while the page is open, e.g. when resizing).
   // ?seed=N in the address shows one specific arrangement instead (11 was the original).
   layoutGems.seed ??= +new URLSearchParams(location.search).get("seed") || Math.floor(Math.random() * 1e6);
@@ -89,7 +89,8 @@ function layoutGems(W, H, fit, sectionGems) {
   const rand = rng(seed), placed = [];
   const cx = W / 2, cy = H / 2;
   // calm space around the words (a rounded rectangle, so it covers the whole text block)
-  const quietX = 380 * fit, quietY = 150 * fit; // a little shorter now the section words are gone
+  // the calm space around the words: measured from the page if given, otherwise the desktop size
+  const quietX = quiet ? quiet.x : 380 * fit, quietY = quiet ? quiet.y : 150 * fit;
   const inQuiet = (x, y, r) => ((x - cx) / (quietX + r)) ** 4 + ((y - cy) / (quietY + r)) ** 4 < 1;
   const fits = (x, y, r, gap) =>
     x - r > 10 && x + r < W - 10 && y - r > 54 && y + r < H - 12 && !inQuiet(x, y, r) &&
@@ -100,11 +101,19 @@ function layoutGems(W, H, fit, sectionGems) {
   // the section gems sit just outside the quiet space
   sectionGems.forEach((s, i) => {
     const a = (s.angle * Math.PI) / 180;
-    placed.push({ name: s.gem, x: cx + Math.cos(a) * (quietX + 46 * fit), y: cy + Math.sin(a) * (quietY + 40 * fit), r: SIZES.section * fit * (s.gem === "pearlBig1" ? 0.72 : 1), section: i, rot: ROTATES.has(s.gem) ? (rand() - 0.5) * 0.6 : 0 });
+    const r = SIZES.section * fit * (s.gem === "pearlBig1" ? 0.72 : 1);
+    let x = cx + Math.cos(a) * (quietX + 46 * fit), y = cy + Math.sin(a) * (quietY + 40 * fit);
+    // narrow screens: keep it on screen, and if it had to move in, move it above/below the words instead
+    const minX = r + 14, maxX = W - r - 14;
+    if (x < minX || x > maxX) {
+      x = Math.min(maxX, Math.max(minX, x));
+      y = cy + Math.sign(Math.sin(a) || 1) * (quietY + r + 30 + rand() * 60 * fit);
+    }
+    placed.push({ name: s.gem, x, y, r, section: i, rot: ROTATES.has(s.gem) ? (rand() - 0.5) * 0.6 : 0 });
   });
 
   // then everything else: a mix of sizes, uneven gaps, sometimes a little cluster
-  const target = Math.round((W * H) / 26000);
+  const target = Math.round((W * H) / (W <= 700 ? 15000 : 26000)); // phones: a bit denser, so they don't look empty
   for (let tries = 0; placed.length < target && tries < 9000; tries++) {
     const roll = rand();
     const kind = roll < 0.1 ? "big" : roll < 0.58 ? "medium" : "small";

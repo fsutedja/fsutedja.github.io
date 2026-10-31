@@ -108,12 +108,26 @@
   .tuner button:hover { background: #fff; }
   /* design tools: hidden on the public page; open the site with ?tune to show them */
   body:not(.tune) .tuner-toggle, body:not(.tune) .tuner, body:not(.tune) .fonts { display: none !important; }
+
+  /* ---------- phones and narrow screens ---------- */
+  @media (max-width: 700px) {
+    html, body { overscroll-behavior: none; }
+    header { padding: 16px 20px; font-size: 10px; }
+    header .where { display: none; }                       /* keep just the time */
+    .hello { width: 92vw; transform: translate(-50%, -50%); }   /* no shrinking: sized with the screen instead */
+    .hello h1 { font-size: clamp(46px, 15vw, 80px); }
+    .hello .tag { font-size: clamp(10.5px, 3.1vw, 12px); white-space: nowrap; letter-spacing: .03em; }
+    .hello .links { gap: 6px 18px; margin-top: 16px; }
+    .hello .links a { padding: 8px 2px; }                   /* bigger tap targets */
+    .panel { padding: 64px 24px 40px; }
+    .panel .back { left: 24px; }
+  }
 </style>
 
 </head>
 <body>
 <div class="field" id="field"></div>
-<header class="mono"><span>freya sutedja</span><span>berkeley, ca · <span id="clock"></span></span></header>
+<header class="mono"><span>freya sutedja</span><span><span class="where">berkeley, ca · </span><span id="clock"></span></span></header>
 
 <div class="hello" id="hello">
   <h1 id="greeting"></h1>
@@ -138,10 +152,10 @@
 </div>
 
 <script>if (new URLSearchParams(location.search).has("tune")) document.body.classList.add("tune");</script>
-<script src="js/content.js?v=1793404104"></script>
+<script src="js/content.js?v=1793406696"></script>
 <script>window.GEM_SHEET = "images/gem-sheet.png";</script>
-<script src="js/gems.js?v=1793404104"></script>
-<script src="js/facets.js?v=1793404104"></script>
+<script src="js/gems.js?v=1793406696"></script>
+<script src="js/facets.js?v=1793406696"></script>
 <script>
 const $ = s => document.querySelector(s);
 const linkList = links => links.map(l => l.url.startsWith("mailto:") ? `<a href="${l.url}">${l.label}</a>` : `<a href="${l.url}" target="_blank" rel="noopener">${l.label}</a>`).join("");
@@ -168,15 +182,23 @@ const renderer = makeFacetRenderer(canvas);
 function build() {
   if (!sprites) return;
   const W = innerWidth, H = innerHeight;
-  fit = Math.min(1, W / 1060, H / 640);
+  const phone = W <= 700;
+  // desktop: the words shrink together on small windows. Phones size the words with CSS instead.
+  fit = phone ? 1 : Math.min(1, W / 1060, H / 640);
   $("#hello").style.setProperty("--fit", fit);
+  // gem size: smaller on phones, but not tiny
+  const gemFit = phone ? Math.max(0.62, W / 620) : fit;
+  // keep gems clear of the actual words (measured, so it works at any size)
+  const box = $("#hello").getBoundingClientRect();
+  const quiet = { x: Math.max(box.width / 2 + 10, phone ? 0 : 380 * fit), y: Math.max(box.height / 2 + 26, phone ? 0 : 150 * fit) };
   field.innerHTML = '<div class="paper"></div>'; field.appendChild(canvas); renderer.resize(W, H);
-  gems = layoutGems(W, H, fit, sections).map((g) => {
+  gems = layoutGems(W, H, gemFit, sections, quiet).map((g) => {
     const sp = sprites[g.name], size = sp.half * 2 * (g.r / sp.r);
-    return { ...g, sp, size, tw: 0, phase: Math.random() * 6, ox: 0, oy: 0, amp: (3 + Math.random() * 5) * fit, speed: .25 + Math.random() * .35 };
+    return { ...g, sp, size, tw: 0, phase: Math.random() * 6, ox: 0, oy: 0, amp: (3 + Math.random() * 5) * gemFit, speed: .25 + Math.random() * .35 };
   });
 }
-makeFacetSprites().then((s) => { sprites = s; build(); });
+// wait for the fonts too, so the words are measured at their real size
+Promise.all([makeFacetSprites(), document.fonts.ready]).then(([s]) => { sprites = s; build(); });
 let resizeTimer; addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(build, 150); });
 
 /* motion + living light */
@@ -184,13 +206,35 @@ let mouse = null;
 // for testing screenshots: ?mx=..&my=.. places a pretend cursor
 const q = new URLSearchParams(location.search); if (q.has("mx")) mouse = { x: +q.get("mx"), y: +q.get("my") };
 addEventListener("pointermove", (e) => (mouse = { x: e.clientX, y: e.clientY }));
+addEventListener("pointerdown", (e) => (mouse = { x: e.clientX, y: e.clientY }));
 document.addEventListener("pointerleave", () => (mouse = null));
+// on touch screens the "cursor" only exists while a finger is down
+addEventListener("pointerup", (e) => { if (e.pointerType !== "mouse") mouse = null; });
+addEventListener("pointercancel", () => (mouse = null));
+
+// phones: tilting the phone changes the angle you look at the gems from
+let tilt = null;
+function onTilt(e) {
+  if (e.beta == null) return;
+  // holding the phone upright-ish is "straight on"; leaning it left/right/forward moves the viewpoint
+  tilt = { x: Math.max(-1, Math.min(1, (e.gamma || 0) / 30)), y: Math.max(-1, Math.min(1, ((e.beta || 0) - 45) / 30)) };
+}
+if ("DeviceOrientationEvent" in window) {
+  if (typeof DeviceOrientationEvent.requestPermission === "function") {
+    // iPhone asks permission, and only after a tap
+    addEventListener("touchend", function ask() {
+      DeviceOrientationEvent.requestPermission().then((r) => { if (r === "granted") addEventListener("deviceorientation", onTilt); }).catch(() => {});
+      removeEventListener("touchend", ask);
+    });
+  } else addEventListener("deviceorientation", onTilt);
+}
 
 let view = { x: 0, y: 0 };
 function frame(ms) {
   const t = ms / 1000, items = [];
   // your viewpoint: the cursor across the page = the angle you look at the gems from (eased, so it feels like moving your head)
-  const want = mouse ? { x: (mouse.x / innerWidth - .5) * 2, y: (mouse.y / innerHeight - .5) * 2 } : { x: Math.sin(t * .17) * .5, y: Math.cos(t * .13) * .4 };
+  const want = mouse ? { x: (mouse.x / innerWidth - .5) * 2, y: (mouse.y / innerHeight - .5) * 2 }
+             : tilt || { x: Math.sin(t * .17) * .5, y: Math.cos(t * .13) * .4 };
   view.x += (want.x - view.x) * .06; view.y += (want.y - view.y) * .06;
   // the light: your cursor; when it's away, a light slowly drifts around above the page
   const light = mouse || { x: innerWidth * (.5 + .42 * Math.cos(t * .23)), y: innerHeight * (.45 + .4 * Math.sin(t * .31)) };
