@@ -178,6 +178,15 @@
   .about span + span { margin-top: 4px; }
   body.email-below .email-line { margin-top: 16px; }
   @media (max-width: 700px) { .about { font-size: 15px; max-width: 86vw; margin-top: 14px; } }
+  /* the "scroll for more" prompt at the bottom of the first screen */
+  .scroll-cue { position: absolute; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 4;
+                color: var(--muted); text-decoration: none; font-size: 11px; letter-spacing: .12em; white-space: nowrap;
+                opacity: 0; transition: opacity 1.2s ease 1.6s; }
+  body.loaded .scroll-cue { opacity: 1; }
+  .scroll-cue .arrow { display: inline-block; margin-left: 4px; animation: nudge 2.4s ease-in-out infinite; }
+  .scroll-cue:hover { color: var(--ink); }
+  @keyframes nudge { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(4px); } }
+  @media (prefers-reduced-motion: reduce) { .scroll-cue .arrow { animation: none; } }
 </style>
 
 </head>
@@ -195,6 +204,7 @@
       <nav class="links mono" id="links"></nav>
     </div>
     <p class="mono email-bottom-line" id="email-bottom"></p>
+    <a class="mono scroll-cue" id="scroll-cue" href="#next">scroll for more <span class="arrow">↓</span></a>
   </section>
   <!-- the next screen: empty for now -->
   <section class="screen" id="next"></section>
@@ -396,6 +406,7 @@ function typeTagline(text) {
   setTimeout(step, 700);   // start shortly after the page appears
 }
 typeTagline(intro.tagline);
+setTimeout(() => document.body.classList.add("loaded"), 50);   // lets the scroll prompt fade in gently
 // the short paragraph: one line per item, fades in after the tagline has typed
 if (intro.about) $("#about").innerHTML = intro.about.map((l) => `<span>${l.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</span>`).join("");
 if (matchMedia("(prefers-reduced-motion: reduce)").matches) $("#about").classList.add("shown");
@@ -426,6 +437,7 @@ function fadeTitle() {
   titleProg = Math.max(0, Math.min(1, 1 - (top - barBottom + 12) / Math.max(1, startGap)));
   // the title's letters leave one by one (see the letter animation); the lines under it simply fade
   animateLines(o);
+  { const c = $("#scroll-cue"); if (c) c.style.opacity = document.body.classList.contains("loaded") ? Math.max(0, 1 - scrollY / 80) : ""; }
   $("#about").style.opacity = typedDone ? o : "";   // the paragraph simply fades as you scroll
   if (!document.body.classList.contains("text-lift")) $("#greeting").style.opacity = o;
   hello.style.pointerEvents = o < 0.1 ? "none" : "";
@@ -494,7 +506,9 @@ function build() {
   const box = $("#hello").getBoundingClientRect();
   const quiet = { x: Math.max(box.width / 2 + 10, phone ? 0 : 380 * fit), y: Math.max(box.height / 2 + 26, phone ? 0 : 150 * fit) };
   field.innerHTML = ""; field.appendChild(canvas); renderer.resize(W, H);
-  gems = layoutGems(W, H, gemFit, sections, quiet).map((g) => {
+  const cue = $("#scroll-cue").getBoundingClientRect();
+  const offCue = (g) => !(g.x + g.r > cue.left - 14 && g.x - g.r < cue.right + 14 && g.y + g.r > cue.top - 14 + scrollY && g.y - g.r < cue.bottom + 14 + scrollY);
+  gems = layoutGems(W, H, gemFit, sections, quiet).filter(offCue).map((g) => {
     const sp = sprites[g.name], size = sp.half * 2 * (g.r / sp.r);
     return { ...g, sp, size, tw: 0, phase: Math.random() * 6, ox: 0, oy: 0, amp: (3 + Math.random() * 5) * gemFit, speed: .25 + Math.random() * .35 };
   });
