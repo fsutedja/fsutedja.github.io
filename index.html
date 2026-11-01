@@ -115,7 +115,7 @@
     header .where { display: none; }                       /* keep just the time */
     .hello { width: 92vw; transform: translate(-50%, -50%) scale(var(--fit, 1)); }   /* sized with the screen; also shrinks if the window is very short */
     .hello h1 { font-size: clamp(46px, 15vw, 80px); }
-    .hello .tag { margin-top: 18px; font-size: max(clamp(10.5px, 3.1vw, 12px), calc(9.5px / var(--fit, 1))); white-space: nowrap; letter-spacing: .03em; }
+    .hello .tag { margin-top: 18px; font-size: max(clamp(9.5px, 2.62vw, 12px), calc(9px / var(--fit, 1))); letter-spacing: .01em; }   /* small enough that each line fits */
     .hello .links { gap: 6px 18px; margin-top: 16px; }
     .hello .links a { padding: 8px 2px; }                   /* bigger tap targets */
     .panel { padding: 64px 24px 40px; }
@@ -167,7 +167,7 @@
   body.text-sheen #greeting i { color: transparent; }
   @media (max-width: 700px) {
     /* phones / small windows: the email is a touch smaller than the tagline, and never shrinks to unreadable */
-    body.email-below .email-line { font-size: max(clamp(10px, 2.9vw, 11px), calc(9px / var(--fit, 1))); }
+    body.email-below .email-line { font-size: max(clamp(9px, 2.45vw, 11px), calc(8.5px / var(--fit, 1))); }
   }
   .lc { display: inline-block; }
   /* the short paragraph between the tagline and the email */
@@ -187,6 +187,23 @@
   .scroll-cue:hover { color: var(--ink); }
   @keyframes nudge { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(4px); } }
   @media (prefers-reduced-motion: reduce) { .scroll-cue .arrow { animation: none; } }
+  .about.staggered span { opacity: 0; transform: translateY(5px); transition: opacity .9s ease, transform .9s ease; }
+  .about.staggered span.in { opacity: 1; transform: none; }
+  .about .untyped { visibility: hidden; }
+  /* merged paragraph + its word-by-word reveals */
+  body.merged .about { margin-top: 18px; font-size: 19px; max-width: 600px; color: var(--ink); }
+  body.merged .about span.w { display: inline-block; }
+  .about .caret { display: inline-block; width: 0; height: 1.05em; vertical-align: -0.15em; border-left: 1.5px solid currentColor; margin-right: -1.5px; }
+  body.mono-about .about { font-family: "IBM Plex Mono", monospace; font-size: 13.5px; line-height: 1.7; letter-spacing: .02em; max-width: 640px; color: var(--soft); }
+  @media (max-width: 700px) { body.mono-about .about { font-size: 11.5px; } }
+  .rv-words .w { opacity: 0; transform: translateY(.3em); transition: opacity .5s ease, transform .5s ease; }        /* words rise into place */
+  .rv-ink .w { opacity: 0; filter: blur(6px); transition: opacity .8s ease, filter .9s ease; }                           /* words soak in like ink */
+  .rv-shine .w { opacity: 0; transition: opacity .35s ease, color .9s ease; color: #c8a2b0; }                            /* words appear with a pink glint that settles */
+  .rv-words .w.in, .rv-ink .w.in { opacity: 1; transform: none; filter: none; }
+  .rv-shine .w.in { opacity: 1; color: var(--ink); }
+  @media (max-width: 700px) { body.merged .about { font-size: 15.5px; } }
+  /* the two typed lines: keep the line break, and let long lines wrap evenly on narrow screens */
+  .hello .tag { white-space: pre-line; text-wrap: balance; line-height: 1.7; }
 </style>
 
 </head>
@@ -228,7 +245,7 @@
 </div>
 
 <script>if (new URLSearchParams(location.search).has("tune")) document.body.classList.add("tune");</script>
-<script src="js/content.js?v=1793498759"></script>
+<script src="js/content.js?v=1793499113"></script>
 <script>window.GEM_SHEET = "images/gem-sheet.png";</script>
 <script src="js/gems.js?v=1793426087"></script>
 <script src="js/facets.js?v=1793426087"></script>
@@ -334,6 +351,9 @@ if (textFx && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
 /* the tagline types itself out, letter by letter, with a blinking cursor.
    The not-yet-typed letters are already there but invisible, so nothing on the page shifts while it types. */
 var typedDone = false;
+const aboutReveal = new URLSearchParams(location.search).get("reveal") || "wait";
+// trying out: ?intro=merged = the tagline becomes the first sentence of one paragraph
+const mergedIntro = new URLSearchParams(location.search).get("intro") === "merged";
 
 /* ---------- the tagline + email as you scroll (trying out: ?lines=untype | rise | slide) ----------
    o goes from 1 (top of page) to 0 (just before the top bar). */
@@ -397,9 +417,9 @@ function typeTagline(text) {
     if (i < text.length) {
       const ch = text[i - 1];
       // a human rhythm: small random variation, a little pause after spaces and punctuation
-      setTimeout(step, 30 + Math.random() * 36 + (ch === " " ? 30 : 0) + (/[),@]/.test(ch) ? 95 : 0));
+      setTimeout(step, 14 + Math.random() * 16 + (ch === " " ? 12 : 0) + (/[)@\n]/.test(ch) ? 70 : 0));   // quick, with a tiny human rhythm
     } else {
-      show(false); typedDone = true; $("#about").classList.add("shown");                                // done: the cursor blinks for a moment…
+      show(false); typedDone = true; if (aboutReveal === "wait") $("#about").classList.add("shown");                                // done: the cursor blinks for a moment…
       setTimeout(() => el.querySelector(".caret")?.classList.add("gone"), 3200);   // …then fades away
     }
   };
@@ -408,8 +428,56 @@ function typeTagline(text) {
 typeTagline(intro.tagline);
 setTimeout(() => document.body.classList.add("loaded"), 50);   // lets the scroll prompt fade in gently
 // the short paragraph: one line per item, fades in after the tagline has typed
+if (mergedIntro) {
+  $("#tagline").style.display = "none";
+  intro.about = ["I study applied math (data science) @ uc berkeley and teach myself everything else from books and the internet.",
+                 "i love finding the structure hiding in messy things and retelling the story it was trying to tell."];
+  document.body.classList.add("merged");
+  if (new URLSearchParams(location.search).get("font") === "mono") document.body.classList.add("mono-about");
+}
 if (intro.about) $("#about").innerHTML = intro.about.map((l) => `<span>${l.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</span>`).join("");
 if (matchMedia("(prefers-reduced-motion: reduce)").matches) $("#about").classList.add("shown");
+/* how the paragraph appears (trying out: ?reveal=wait | together | stagger | type) */
+else if (mergedIntro && aboutReveal === "typed") {
+  // the whole paragraph types itself, quickly, with a cursor; untyped letters keep their space so nothing shifts
+  const about = $("#about"), lines = [...about.children].map((l) => l.textContent), total = lines.join("").length;
+  about.classList.add("shown");
+  const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  let i = 0;
+  const draw = (caret) => {
+    let left = i;
+    about.innerHTML = lines.map((l) => {
+      const k = Math.max(0, Math.min(l.length, left)); left -= l.length;
+      const here = caret && k < l.length && (k > 0 || left + l.length === 0) ? '<span class="caret typing"></span>' : "";
+      return `<span>${esc(l.slice(0, k))}${here}<span class="untyped">${esc(l.slice(k))}</span></span>`;
+    }).join("");
+  };
+  draw(true);
+  const step = () => { i = Math.min(total, i + 2 + (Math.random() < 0.3 ? 1 : 0)); draw(i < total); if (i < total) setTimeout(step, 16 + Math.random() * 14); else typedDone = true; };
+  setTimeout(step, 500);
+}
+else if (mergedIntro) {
+  // split into words so each word can arrive on its own
+  [...$("#about").children].forEach((line) => {
+    line.innerHTML = line.textContent.split(" ").map((w) => `<span class="w">${w.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</span>`).join(" ");
+  });
+  const words = [...$("#about").querySelectorAll(".w")];
+  $("#about").classList.add("shown", "rv-" + (aboutReveal === "wait" ? "words" : aboutReveal));
+  words.forEach((w, i) => setTimeout(() => w.classList.add("in"), 500 + i * (aboutReveal === "ink" ? 55 : 38)));
+}
+else if (aboutReveal === "together") setTimeout(() => $("#about").classList.add("shown"), 400);       // fades in with the page
+else if (aboutReveal === "stagger") {                                                                // line by line, while the tagline types
+  $("#about").classList.add("shown", "staggered");
+  [...$("#about").children].forEach((line, n) => setTimeout(() => line.classList.add("in"), 900 + n * 650));
+} else if (aboutReveal === "type") {                                                                 // the lines type themselves too, quickly, overlapping
+  $("#about").classList.add("shown");
+  [...$("#about").children].forEach((line, n) => {
+    const full = line.textContent; line.dataset.text = full; line.innerHTML = `<span class="untyped">${full}</span>`;
+    let i = 0;
+    const step = () => { i += 2; line.innerHTML = full.slice(0, i).replace(/&/g, "&amp;") + `<span class="untyped">${full.slice(i).replace(/&/g, "&amp;")}</span>`; if (i < full.length) setTimeout(step, 22); };
+    setTimeout(step, 1100 + n * 700);
+  });
+}
 { const plain = intro.links.find((l) => !l.url); if (plain) { $("#email-line").textContent = plain.label; $("#email-bottom").textContent = plain.label; } }
 { const e = new URLSearchParams(location.search).get("email") || "below"; if (e === "below" || e === "bottom") document.body.classList.add("email-" + e); }   // "below" = chosen
 
