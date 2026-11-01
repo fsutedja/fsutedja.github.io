@@ -170,6 +170,14 @@
     body.email-below .email-line { font-size: max(clamp(10px, 2.9vw, 11px), calc(9px / var(--fit, 1))); }
   }
   .lc { display: inline-block; }
+  /* the short paragraph between the tagline and the email */
+  .about { margin: 18px auto 0; max-width: 560px; font-family: var(--display); font-size: 18px; line-height: 1.5; color: var(--soft);
+           font-variation-settings: "SOFT" 100, "opsz" 24; opacity: 0; transform: translateY(6px); transition: opacity 1s ease, transform 1s ease; }
+  .about.shown { opacity: 1; transform: none; }
+  .about span { display: block; text-wrap: balance; }   /* wrapped lines come out even, no lonely last word */
+  .about span + span { margin-top: 4px; }
+  body.email-below .email-line { margin-top: 16px; }
+  @media (max-width: 700px) { .about { font-size: 15px; max-width: 86vw; margin-top: 14px; } }
 </style>
 
 </head>
@@ -182,6 +190,7 @@
     <div class="hello" id="hello">
       <h1 id="greeting"></h1>
       <p class="mono tag" id="tagline"></p>
+      <p class="about" id="about"></p>
       <p class="mono email-line" id="email-line"></p>
       <nav class="links mono" id="links"></nav>
     </div>
@@ -209,7 +218,7 @@
 </div>
 
 <script>if (new URLSearchParams(location.search).has("tune")) document.body.classList.add("tune");</script>
-<script src="js/content.js?v=1793426087"></script>
+<script src="js/content.js?v=1793498462"></script>
 <script>window.GEM_SHEET = "images/gem-sheet.png";</script>
 <script src="js/gems.js?v=1793426087"></script>
 <script src="js/facets.js?v=1793426087"></script>
@@ -380,13 +389,16 @@ function typeTagline(text) {
       // a human rhythm: small random variation, a little pause after spaces and punctuation
       setTimeout(step, 30 + Math.random() * 36 + (ch === " " ? 30 : 0) + (/[),@]/.test(ch) ? 95 : 0));
     } else {
-      show(false); typedDone = true;                                // done: the cursor blinks for a moment…
+      show(false); typedDone = true; $("#about").classList.add("shown");                                // done: the cursor blinks for a moment…
       setTimeout(() => el.querySelector(".caret")?.classList.add("gone"), 3200);   // …then fades away
     }
   };
   setTimeout(step, 700);   // start shortly after the page appears
 }
 typeTagline(intro.tagline);
+// the short paragraph: one line per item, fades in after the tagline has typed
+if (intro.about) $("#about").innerHTML = intro.about.map((l) => `<span>${l.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</span>`).join("");
+if (matchMedia("(prefers-reduced-motion: reduce)").matches) $("#about").classList.add("shown");
 { const plain = intro.links.find((l) => !l.url); if (plain) { $("#email-line").textContent = plain.label; $("#email-bottom").textContent = plain.label; } }
 { const e = new URLSearchParams(location.search).get("email") || "below"; if (e === "below" || e === "bottom") document.body.classList.add("email-" + e); }   // "below" = chosen
 
@@ -401,7 +413,7 @@ function fadeTitle() {
   gemsLeft = Math.max(0, Math.min(1, (top - barBottom + 12) / travel)); // 1 at the top of the page → 0 exactly when the text is gone
   // the exact area the words cover right now (gems are kept out of it)
   textBox = null;
-  for (const el of [$("#greeting"), $("#tagline"), $("#email-line")]) {
+  for (const el of [$("#greeting"), $("#tagline"), $("#about"), $("#email-line")]) {
     if (!el.offsetParent || !el.textContent.trim()) continue;   // skip if hidden or empty
     const r = document.createRange(); r.selectNodeContents(el); const b = r.getBoundingClientRect();
     textBox = textBox ? { l: Math.min(textBox.l, b.left), r: Math.max(textBox.r, b.right), t: Math.min(textBox.t, b.top), b: Math.max(textBox.b, b.bottom) }
@@ -414,6 +426,7 @@ function fadeTitle() {
   titleProg = Math.max(0, Math.min(1, 1 - (top - barBottom + 12) / Math.max(1, startGap)));
   // the title's letters leave one by one (see the letter animation); the lines under it simply fade
   animateLines(o);
+  $("#about").style.opacity = typedDone ? o : "";   // the paragraph simply fades as you scroll
   if (!document.body.classList.contains("text-lift")) $("#greeting").style.opacity = o;
   hello.style.pointerEvents = o < 0.1 ? "none" : "";
 }
