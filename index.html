@@ -205,6 +205,8 @@
   @media (max-width: 700px) { body.merged .about { font-size: 15.5px; } }
   /* the two typed lines: keep the line break, and let long lines wrap evenly on narrow screens */
   .hello .tag { white-space: pre-line; text-wrap: balance; line-height: 1.7; }
+  /* "Hi, I'm" a little smaller than the name */
+  #greeting .hi { font-size: .82em; }
 </style>
 
 </head>
@@ -246,7 +248,7 @@
 </div>
 
 <script>if (new URLSearchParams(location.search).has("tune")) document.body.classList.add("tune");</script>
-<script src="js/content.js?v=1793499514"></script>
+<script src="js/content.js?v=1793499631"></script>
 <script>window.GEM_SHEET = "images/gem-sheet.png";</script>
 <script src="js/gems.js?v=1793426087"></script>
 <script src="js/facets.js?v=1793426087"></script>
@@ -576,7 +578,7 @@ function build() {
   $("#hello").style.setProperty("--fit", fit);
   // gem size: smaller on phones, but not tiny
   const gemFit = (phone ? Math.max(0.62, W / 620) * Math.max(0.6, fit) : Math.max(fit, H > W ? 0.88 : 0.7))   // tablets in portrait: gems not too small
-    * (+new URLSearchParams(location.search).get("gs") || 0.8);                                                    // gems at 80% (chosen)
+    * (+new URLSearchParams(location.search).get("gs") || 0.9);   // gems at 90% (between the old size and 80%)
   // keep gems clear of the actual words (measured, so it works at any size)
   const box = $("#hello").getBoundingClientRect();
   const quiet = { x: Math.max(box.width / 2 + 10, phone ? 0 : 380 * fit), y: Math.max(box.height / 2 + 26, phone ? 0 : 150 * fit) };
