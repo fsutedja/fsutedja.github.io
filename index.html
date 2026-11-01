@@ -156,7 +156,9 @@
     .email-line { display: block; margin-top: 7px; color: var(--muted); font-size: 11px; letter-spacing: .03em; text-transform: none; }  /* …so it sits under the tagline */
   }
   /* interactive title */
-  #greeting .ch { display: inline-block; will-change: transform; }
+  /* each letter is its own box (so it can lift). Safari trims anything outside that box, and the italic F's
+     slanted top pokes out, so every box gets invisible extra room that the negative margin cancels out */
+  #greeting .ch { display: inline-block; padding: .2em .14em; margin: -.2em -.14em; }
   body.text-sheen #greeting { background: radial-gradient(circle 150px at var(--mx, -999px) var(--my, -999px),
         #e8a9bb 0%, #c9a6e0 22%, #9fd3d6 38%, #3a3433 62%) var(--ink); -webkit-background-clip: text; background-clip: text; color: transparent;
         padding: .12em .05em .25em; margin: -.12em -.05em -.25em; }   /* room for the y's tail and the apostrophe */
