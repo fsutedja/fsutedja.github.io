@@ -250,7 +250,7 @@
 </div>
 
 <script>if (new URLSearchParams(location.search).has("tune")) document.body.classList.add("tune");</script>
-<script src="js/content.js?v=1793499631"></script>
+<script src="js/content.js?v=1793500372"></script>
 <script>window.GEM_SHEET = "images/gem-sheet.png";</script>
 <script src="js/gems.js?v=1793426087"></script>
 <script src="js/facets.js?v=1793426087"></script>
@@ -380,8 +380,12 @@ function animateLines(o) {
   if (linesStyle === "untype") {
     // the lines delete themselves backwards, like someone holding backspace (email first, then the tagline)
     els.forEach((el, n) => {
-      if (n === 0 && !typedDone) return;             // let the tagline finish typing first
-      const full = el.dataset.full || (n === 0 ? intro.tagline : el.textContent);
+      if (n === 0) {
+        // the tagline's rotating word stops while you scroll, and starts again when you're back at the top
+        if (q <= 0) { if (rot.paused) { rot.paused = false; drawTagline(false); rot.timer = setTimeout(rotate, 900); } return; }
+        if (!rot.paused) { rot.paused = true; clearTimeout(rot.timer); el.dataset.full = currentTagline(); delete el.dataset.keep; }
+      }
+      const full = el.dataset.full || el.textContent;
       if (!full) return;
       el.dataset.full = full;
       const part = n === 0 ? Math.max(0, Math.min(1, (q - 0.25) / 0.75)) : Math.max(0, Math.min(1, q));   // email starts first; both finish exactly at the end
@@ -435,7 +439,26 @@ function typeTagline(text) {
   };
   setTimeout(step, 700);   // start shortly after the page appears
 }
-typeTagline(intro.tagline);
+/* the tagline is static, except the last word: it types, pauses, deletes itself and types the next one */
+const rot = { words: intro.taughtFrom || [], w: 0, i: 0, paused: false, timer: null };
+const currentTagline = () => intro.tagline + (rot.words[rot.w] || "").slice(0, rot.i) + ".";
+function drawTagline(typing) {
+  const el = $("#tagline"), word = (rot.words[rot.w] || "").slice(0, rot.i);
+  el.innerHTML = esc2(intro.tagline) + `<span class="rot">${esc2(word)}</span><span class="caret${typing ? " typing" : ""}"></span>.`;
+  delete el.dataset.full; delete el.dataset.keep;
+}
+function rotate() {
+  clearTimeout(rot.timer);
+  if (rot.paused || !rot.words.length) return;
+  const word = rot.words[rot.w];
+  if (!rot.deleting && rot.i < word.length) { rot.i++; drawTagline(true); rot.timer = setTimeout(rotate, 55 + Math.random() * 45); }
+  else if (!rot.deleting) { rot.deleting = true; drawTagline(false); rot.timer = setTimeout(rotate, 1700); }          // hold the full word
+  else if (rot.i > 0) { rot.i--; drawTagline(true); rot.timer = setTimeout(rotate, 32); }                          // backspace
+  else { rot.deleting = false; rot.w = (rot.w + 1) % rot.words.length; drawTagline(true); rot.timer = setTimeout(rotate, 350); }
+}
+typedDone = true;
+if (matchMedia("(prefers-reduced-motion: reduce)").matches) { rot.i = (rot.words[0] || "").length; drawTagline(false); }
+else { rot.i = (rot.words[0] || "").length; rot.deleting = true; drawTagline(false); rot.timer = setTimeout(rotate, 2200); }   // start showing the first word
 setTimeout(() => document.body.classList.add("loaded"), 50);
 // after the first fade-in has played, the prompt just follows the scroll
 setTimeout(() => { cueShown = true; const c = $("#scroll-cue"); c.style.animation = "none"; c.style.opacity = Math.max(0, 1 - scrollY / 80); }, 2900);   // lets the scroll prompt fade in gently

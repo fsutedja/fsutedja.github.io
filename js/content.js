@@ -12,7 +12,9 @@
 const intro = {
   greeting: "<span class=\"hi\">Hi, I’m</span> <i>Freya</i>",   // <i>…</i> = italic
   // two lines that type themselves under your name ("\n" = new line)
-  tagline: "applied math (data science) @ uc berkeley\n& everything else self-taught from books and the internet.",
+  tagline: "applied math (data science) @ uc berkeley\n& everything else self-taught from ",
+  // the word at the end of the tagline keeps typing and switching between these
+  taughtFrom: ["books", "the internet", "conversations", "building things"],
   links: [
     // { label: "résumé", url: "resume.pdf" },      // hidden for now: remove the // to bring it back
     { label: "linkedin", url: "https://www.linkedin.com/in/freyaas/" },
