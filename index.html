@@ -217,7 +217,31 @@ $("#greeting").innerHTML = intro.greeting; // allows the italic F
 
 /* ---------- interactive title (trying out: ?text=sheen | lift | press) ----------
    Each letter becomes its own little piece, so it can react to how close the cursor (or finger) is. */
-const textFx = new URLSearchParams(location.search).get("text") || "lift";   // "lift" = chosen
+const textFx = new URLSearchParams(location.search).get("text") || "lift";
+
+/* ---------- how the title's letters leave as you scroll (trying out: ?letters=rise | scatter | wave) ----------
+   p = how far the title is toward the top bar (0 → 1). Each letter gets its own head start and speed,
+   so some leave first and faster. Every letter is gone by p = 1, so nothing ever touches the top bar. */
+var titleProg = 0;   // 0 at the top of the page → 1 when the title reaches the bar (set while scrolling)
+const letterStyle = new URLSearchParams(location.search).get("letters") || "rise";
+const seedOf = (i) => { const v = Math.sin(i * 12.9898 + 78.233) * 43758.5453; return v - Math.floor(v); };
+const smooth = (a) => (a <= 0 ? 0 : a >= 1 ? 1 : a * a * (3 - 2 * a));
+function exitLetter(i, n, p) {
+  if (p <= 0) return { dx: 0, dy: 0, rot: 0, alpha: 1 };
+  const r1 = seedOf(i), r2 = seedOf(i + 31), side = (i / Math.max(1, n - 1)) * 2 - 1;   // side: -1 left … +1 right
+  let start, dur;
+  if (letterStyle === "wave") { start = (i / n) * 0.45; dur = 0.45; }          // left to right, like a ripple
+  else { start = r1 * 0.22; dur = 0.62 + r2 * 0.12; }                         // random order, but close together and similar speeds
+  const t = smooth((p - start) / dur);
+  if (letterStyle === "scatter") {
+    return { dx: side * t * (60 + r2 * 90), dy: -t * (40 + r1 * 70), rot: (r2 - 0.5) * 70 * t, alpha: 1 - t };
+  }
+  if (letterStyle === "wave") {
+    return { dx: 0, dy: -t * 46, rot: -t * 8, alpha: 1 - t };
+  }
+  // rise: letters float up like bubbles, each at its own speed, with a little sway
+  return { dx: Math.sin(i * 2.3) * 5 * t, dy: -t * (60 + r2 * 25), rot: (r1 - 0.5) * 9 * t, alpha: 1 - t * t };
+}   // "lift" = chosen
 if (textFx && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
   const h1 = $("#greeting");
   const split = (node) => {
@@ -260,7 +284,7 @@ if (textFx && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
     } else {
       // nothing to do when no cursor/finger is near and every letter has settled
       const near = px > box.left - 260 && px < box.right + 260 && py > box.top - 260 && py < box.bottom + 260;
-      if (!near && idle) { requestAnimationFrame(tick); return; }
+      if (!near && idle && titleProg === 0) { requestAnimationFrame(tick); return; }
       let moving = false;
       letters.forEach((el, i) => {
         const c = centres[i] || [0, 0];
@@ -270,7 +294,11 @@ if (textFx && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
         state[i] += (want - state[i]) * 0.14;                        // eased, so it feels soft
         if (Math.abs(state[i] - before) > 0.001 || state[i] > 0.002) moving = true;
         const k = state[i] < 0.002 && want < 0.002 ? (state[i] = 0) : state[i];
-        if (textFx === "lift") el.style.transform = `translateY(${(-k * 9).toFixed(2)}px) rotate(${(Math.sin(i * 1.7) * k * 4).toFixed(2)}deg)`;
+        if (textFx === "lift") {
+          const x = exitLetter(i, letters.length, titleProg);
+          el.style.transform = `translate(${x.dx.toFixed(1)}px, ${(-k * 9 + x.dy).toFixed(1)}px) rotate(${(Math.sin(i * 1.7) * k * 4 + x.rot).toFixed(2)}deg)`;
+          el.style.opacity = x.alpha.toFixed(3);
+        }
         if (textFx === "press") {
           const italic = !!el.closest("i");
           el.style.fontVariationSettings = `"wght" ${(440 + k * 190).toFixed(0)}, "SOFT" 100, "WONK" ${italic ? 1 : 0}, "opsz" 144`;
@@ -330,7 +358,10 @@ function fadeTitle() {
   // so the title is always fully visible before you start scrolling
   const startGap = top + scrollY - barBottom + 12;
   const o = Math.max(0, Math.min(1, (top - barBottom + 12) / Math.max(1, Math.min(110, startGap))));   // fully gone just as it reaches the bar's text, starts fading ~100px before
-  hello.style.opacity = o;
+  titleProg = Math.max(0, Math.min(1, 1 - (top - barBottom + 12) / Math.max(1, startGap)));
+  // the title's letters leave one by one (see the letter animation); the lines under it simply fade
+  for (const el of [$("#tagline"), $("#email-line")]) el.style.opacity = o;
+  if (!document.body.classList.contains("text-lift")) $("#greeting").style.opacity = o;
   hello.style.pointerEvents = o < 0.1 ? "none" : "";
 }
 addEventListener("scroll", () => requestAnimationFrame(fadeTitle), { passive: true });
