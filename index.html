@@ -125,10 +125,10 @@
   .exit-try button { font: inherit; background: none; border: 1px solid transparent; border-radius: 999px; padding: 5px 11px; cursor: pointer; color: #3a3433; }
   .exit-try button.on { border-color: #3a3433; }
   /* typing animation for the tagline */
-  .tag .untyped { visibility: hidden; }
-  .tag .caret { display: inline-block; width: 0; height: 1.15em; vertical-align: -0.2em; border-left: 1.5px solid currentColor; margin-right: -1.5px;
+  .tag .untyped, .email-line .untyped { visibility: hidden; }
+  .tag .caret, .email-line .caret { display: inline-block; width: 0; height: 1.15em; vertical-align: -0.2em; border-left: 1.5px solid currentColor; margin-right: -1.5px;
                 animation: blink 1s steps(1) infinite; transition: opacity .6s; }
-  .tag .caret.typing { animation: none; }          /* solid while typing, blinks when it stops */
+  .tag .caret.typing, .email-line .caret.typing { animation: none; }          /* solid while typing, blinks when it stops */
   .tag .caret.gone { opacity: 0; animation: none; }
   @keyframes blink { 50% { opacity: 0; } }
   /* links in the top bar (trying out: ?links=a = centre of the bar, ?links=c = right side with the time) */
@@ -167,6 +167,7 @@
     /* phones / small windows: the email is a touch smaller than the tagline, and never shrinks to unreadable */
     body.email-below .email-line { font-size: max(clamp(10px, 2.9vw, 11px), calc(9px / var(--fit, 1))); }
   }
+  .lc { display: inline-block; }
 </style>
 
 </head>
@@ -311,6 +312,56 @@ if (textFx && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
 }
 /* the tagline types itself out, letter by letter, with a blinking cursor.
    The not-yet-typed letters are already there but invisible, so nothing on the page shifts while it types. */
+var typedDone = false;
+
+/* ---------- the tagline + email as you scroll (trying out: ?lines=untype | rise | slide) ----------
+   o goes from 1 (top of page) to 0 (just before the top bar). */
+const linesStyle = new URLSearchParams(location.search).get("lines") || "untype";
+const esc2 = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+const lineEls = () => [$("#tagline"), $("#email-line")].filter((el) => el && el.offsetParent);
+function splitLine(el) {   // one span per letter (for "rise"); spaces keep their width
+  if (el.dataset.split || !el.textContent) return; el.dataset.split = 1; el.dataset.full = el.textContent;
+  el.innerHTML = [...el.textContent].map((c) => `<span class="lc">${c === " " ? "&nbsp;" : esc2(c)}</span>`).join("");
+}
+function animateLines(o) {
+  const q = Math.max(1 - o, titleProg);              // 0 → 1 as the lines leave (in step with the title)
+  const els = lineEls();
+  if (linesStyle === "untype") {
+    // the lines delete themselves backwards, like someone holding backspace (email first, then the tagline)
+    els.forEach((el, n) => {
+      if (n === 0 && !typedDone) return;             // let the tagline finish typing first
+      const full = el.dataset.full || (n === 0 ? intro.tagline : el.textContent);
+      if (!full) return;
+      el.dataset.full = full;
+      const part = Math.max(0, Math.min(1, (q - (n === 0 ? 0.25 : 0)) / 0.75));   // email goes first, tagline overlaps after
+      const keep = Math.round(full.length * (1 - part));
+      if (el.dataset.keep == keep) return; el.dataset.keep = keep;
+      const caret = keep < full.length && keep > 0 ? '<span class="caret typing"></span>' : "";
+      el.innerHTML = esc2(full.slice(0, keep)) + caret + `<span class="untyped">${esc2(full.slice(keep))}</span>`;
+    });
+    return;
+  }
+  if (linesStyle === "rise") {
+    els.forEach((el, n) => {
+      if (n === 0 && !typedDone) { el.style.opacity = o; return; }
+      splitLine(el);
+      const spans = el.querySelectorAll(".lc"), m = spans.length;
+      spans.forEach((sp, i) => {
+        const r = Math.sin(i * 12.9898 + n * 7.1) * 43758.5453 % 1, start = Math.abs(r) * 0.25;
+        const t = Math.max(0, Math.min(1, (q - start) / 0.65)), e = t * t * (3 - 2 * t);
+        sp.style.transform = `translateY(${(-e * (14 + Math.abs(r) * 10)).toFixed(1)}px)`;
+        sp.style.opacity = (1 - e).toFixed(3);
+      });
+    });
+    return;
+  }
+  // slide: the tagline glides left, the email right, as they fade
+  els.forEach((el, n) => {
+    const e = q * q * (3 - 2 * q);
+    el.style.transform = `translateX(${((n === 0 ? -1 : 1) * e * 70).toFixed(1)}px)`;
+    el.style.opacity = 1 - e;
+  });
+}
 function typeTagline(text) {
   const el = $("#tagline");
   if (matchMedia("(prefers-reduced-motion: reduce)").matches) { el.textContent = text; return; }
@@ -327,7 +378,7 @@ function typeTagline(text) {
       // a human rhythm: small random variation, a little pause after spaces and punctuation
       setTimeout(step, 30 + Math.random() * 36 + (ch === " " ? 30 : 0) + (/[),@]/.test(ch) ? 95 : 0));
     } else {
-      show(false);                                                  // done: the cursor blinks for a moment…
+      show(false); typedDone = true;                                // done: the cursor blinks for a moment…
       setTimeout(() => el.querySelector(".caret")?.classList.add("gone"), 3200);   // …then fades away
     }
   };
@@ -360,7 +411,7 @@ function fadeTitle() {
   const o = Math.max(0, Math.min(1, (top - barBottom + 12) / Math.max(1, Math.min(110, startGap))));   // fully gone just as it reaches the bar's text, starts fading ~100px before
   titleProg = Math.max(0, Math.min(1, 1 - (top - barBottom + 12) / Math.max(1, startGap)));
   // the title's letters leave one by one (see the letter animation); the lines under it simply fade
-  for (const el of [$("#tagline"), $("#email-line")]) el.style.opacity = o;
+  animateLines(o);
   if (!document.body.classList.contains("text-lift")) $("#greeting").style.opacity = o;
   hello.style.pointerEvents = o < 0.1 ? "none" : "";
 }
