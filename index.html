@@ -115,7 +115,7 @@
     header .where { display: none; }                       /* keep just the time */
     .hello { width: 92vw; transform: translate(-50%, -50%) scale(var(--fit, 1)); }   /* sized with the screen; also shrinks if the window is very short */
     .hello h1 { font-size: clamp(46px, 15vw, 80px); }
-    .hello .tag { margin-top: 18px; font-size: max(clamp(9.5px, 2.62vw, 12px), calc(9px / var(--fit, 1))); letter-spacing: .01em; }   /* small enough that each line fits */
+    .hello .tag { margin-top: 18px; font-size: max(clamp(9.2px, 2.5vw, 12px), calc(8.8px / var(--fit, 1))); letter-spacing: 0; }   /* small enough that each line fits */
     .hello .links { gap: 6px 18px; margin-top: 16px; }
     .hello .links a { padding: 8px 2px; }                   /* bigger tap targets */
     .panel { padding: 64px 24px 40px; }
@@ -176,7 +176,8 @@
   .about.shown { opacity: 1; transform: none; }
   .about span { display: block; text-wrap: balance; }   /* wrapped lines come out even, no lonely last word */
   .about span + span { margin-top: 2px; }
-  body.email-below .email-line { margin-top: 16px; }
+  body.email-below .email-line { margin-top: 6px; }
+  .about:empty { display: none; }   /* no paragraph right now, so it takes no space */
   @media (max-width: 700px) { .about { font-size: 15px; max-width: 86vw; margin-top: 7px; } }
   /* the "scroll for more" prompt at the bottom of the first screen */
   .scroll-cue { position: absolute; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 4;
