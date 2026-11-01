@@ -17,6 +17,7 @@
   /* each part of the page is one full screen (svh = the visible screen height on phones) */
   .screen { position: relative; height: 100vh; height: 100svh; }
   a { color: inherit; }
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }   /* stop phones from enlarging text on their own */
   .mono { font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: .07em; text-transform: uppercase; }
 
   /* the field the gems lie on. Its background is what the gems' "multiply" blends with,
@@ -115,7 +116,9 @@
     header .where { display: none; }                       /* keep just the time */
     .hello { width: 92vw; transform: translate(-50%, -50%) scale(var(--fit, 1)); }   /* sized with the screen; also shrinks if the window is very short */
     .hello h1 { font-size: calc(clamp(46px, 15vw, 80px) * var(--ts, 1)); }
-    .hello .tag { margin-top: 11px; font-size: max(clamp(9.2px, 2.5vw, 12px), calc(8.8px / var(--fit, 1))); letter-spacing: 0; }   /* small enough that each line fits */
+    /* small enough that each line fits: never bigger than what lets the longest line (--tag-ch letters, set in the script) fit the width */
+    .hello .tag { margin-top: 11px; font-size: min(max(clamp(9.2px, 2.5vw, 12px), calc(8.8px / var(--fit, 1))), calc(92vw / (var(--tag-ch, 52) * 0.62)));
+                  letter-spacing: 0; }
     .hello .links { gap: 6px 18px; margin-top: 16px; }
     .hello .links a { padding: 8px 2px; }                   /* bigger tap targets */
     .panel { padding: 64px 24px 40px; }
@@ -207,6 +210,7 @@
   @media (max-width: 700px) { body.merged .about { font-size: 15.5px; } }
   /* the two typed lines: keep the line break, and let long lines wrap evenly on narrow screens */
   .hello .tag { white-space: pre-line; text-wrap: balance; line-height: 1.7; }
+  @media (max-width: 700px) { .hello .tag { white-space: pre; } }   /* phones: each line stays one line (the font is sized so it fits) */
   /* "Hi, I'm" a little smaller than the name */
   #greeting .hi { font-size: .82em; }
 </style>
@@ -441,6 +445,8 @@ function typeTagline(text) {
 }
 /* the tagline is static, except the last word: it types, pauses, deletes itself and types the next one */
 const rot = { words: (intro.taughtFrom || []).map((w) => w + "."), w: 0, i: 0, paused: false, timer: null };   // the full stop is typed with each word
+// the longest line the tagline can ever show (with the longest word), so phones can size it to always fit on one line
+$("#tagline").style.setProperty("--tag-ch", Math.max(...(intro.tagline + rot.words.reduce((a, b) => (b.length > a.length ? b : a), "")).split("\n").map((l) => l.length)) + 1);
 const currentTagline = () => intro.tagline + (rot.words[rot.w] || "").slice(0, rot.i);
 function drawTagline(typing) {
   const el = $("#tagline"), word = (rot.words[rot.w] || "").slice(0, rot.i);
