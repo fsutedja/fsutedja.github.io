@@ -51,7 +51,7 @@
   /* title (draft B): upright "hi, i’m" + italic "Freya", both Fraunces at weight 440 */
   .hello h1#greeting { font-weight: 440 !important; font-variation-settings: "SOFT" 100, "WONK" 0, "opsz" 144 !important; letter-spacing: -0.025em; }
   .hello h1 i { font-style: italic; font-weight: 440; font-variation-settings: "SOFT" 100, "WONK" 1, "opsz" 144; }
-  .hello h1 { font-family: var(--display); font-weight: 400; font-size: 104px; line-height: 1; letter-spacing: -0.02em; white-space: nowrap; }
+  .hello h1 { font-family: var(--display); font-weight: 400; font-size: calc(104px * var(--ts, 1)); line-height: 1; letter-spacing: -0.02em; white-space: nowrap; }
   .hello .tag { margin-top: 26px; color: var(--soft); text-transform: none; font-size: max(13px, calc(11px / var(--fit, 1))); letter-spacing: .06em; }
   .hello .links { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
   .hello .links { margin-top: 18px; }
@@ -114,7 +114,7 @@
     header { padding: 16px 20px; font-size: 10px; }
     header .where { display: none; }                       /* keep just the time */
     .hello { width: 92vw; transform: translate(-50%, -50%) scale(var(--fit, 1)); }   /* sized with the screen; also shrinks if the window is very short */
-    .hello h1 { font-size: clamp(46px, 15vw, 80px); }
+    .hello h1 { font-size: calc(clamp(46px, 15vw, 80px) * var(--ts, 1)); }
     .hello .tag { margin-top: 18px; font-size: max(clamp(9.2px, 2.5vw, 12px), calc(8.8px / var(--fit, 1))); letter-spacing: 0; }   /* small enough that each line fits */
     .hello .links { gap: 6px 18px; margin-top: 16px; }
     .hello .links a { padding: 8px 2px; }                   /* bigger tap targets */
@@ -246,7 +246,7 @@
 </div>
 
 <script>if (new URLSearchParams(location.search).has("tune")) document.body.classList.add("tune");</script>
-<script src="js/content.js?v=1793499265"></script>
+<script src="js/content.js?v=1793499514"></script>
 <script>window.GEM_SHEET = "images/gem-sheet.png";</script>
 <script src="js/gems.js?v=1793426087"></script>
 <script src="js/facets.js?v=1793426087"></script>
@@ -254,6 +254,11 @@
 const $ = s => document.querySelector(s);
 const linkList = links => links.map(l => !l.url ? `<span class="plain">${l.label}</span>` : l.url.startsWith("mailto:") ? `<a href="${l.url}">${l.label}</a>` : `<a href="${l.url}" target="_blank" rel="noopener">${l.label}</a>`).join("");
 $("#greeting").innerHTML = intro.greeting; // allows the italic F
+/* trying out: ?greet=cap ("Hi, I'm Freya") or ?greet=italic (all italic), ?ts=0.8 (title size), ?gs=0.8 (gem size) */
+{ const q = new URLSearchParams(location.search);
+  if (q.get("greet") === "cap") $("#greeting").innerHTML = "Hi, I\u2019m <i>Freya</i>";
+  if (q.get("greet") === "italic") $("#greeting").innerHTML = "<i>Hi, I\u2019m Freya</i>";
+  document.documentElement.style.setProperty("--ts", q.get("ts") || 0.8); }   // title at 80% (chosen)
 
 /* ---------- interactive title (trying out: ?text=sheen | lift | press) ----------
    Each letter becomes its own little piece, so it can react to how close the cursor (or finger) is. */
@@ -570,7 +575,8 @@ function build() {
   fit = phone ? Math.min(1, H / 600) : Math.min(1, W / 900, H / 560);
   $("#hello").style.setProperty("--fit", fit);
   // gem size: smaller on phones, but not tiny
-  const gemFit = phone ? Math.max(0.62, W / 620) * Math.max(0.6, fit) : Math.max(fit, H > W ? 0.88 : 0.7);   // tablets in portrait: gems not too small
+  const gemFit = (phone ? Math.max(0.62, W / 620) * Math.max(0.6, fit) : Math.max(fit, H > W ? 0.88 : 0.7))   // tablets in portrait: gems not too small
+    * (+new URLSearchParams(location.search).get("gs") || 0.8);                                                    // gems at 80% (chosen)
   // keep gems clear of the actual words (measured, so it works at any size)
   const box = $("#hello").getBoundingClientRect();
   const quiet = { x: Math.max(box.width / 2 + 10, phone ? 0 : 380 * fit), y: Math.max(box.height / 2 + 26, phone ? 0 : 150 * fit) };
