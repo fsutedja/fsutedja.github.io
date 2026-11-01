@@ -232,7 +232,7 @@ function exitLetter(i, n, p) {
   const r1 = seedOf(i), r2 = seedOf(i + 31), side = (i / Math.max(1, n - 1)) * 2 - 1;   // side: -1 left … +1 right
   let start, dur;
   if (letterStyle === "wave") { start = (i / n) * 0.45; dur = 0.45; }          // left to right, like a ripple
-  else { start = r1 * 0.22; dur = 0.62 + r2 * 0.12; }                         // random order, but close together and similar speeds
+  else { start = r1 * 0.22; dur = 1 - start; }                                // random order, close together; every letter finishes exactly at the end
   const t = smooth((p - start) / dur);
   if (letterStyle === "scatter") {
     return { dx: side * t * (60 + r2 * 90), dy: -t * (40 + r1 * 70), rot: (r2 - 0.5) * 70 * t, alpha: 1 - t };
@@ -333,7 +333,7 @@ function animateLines(o) {
       const full = el.dataset.full || (n === 0 ? intro.tagline : el.textContent);
       if (!full) return;
       el.dataset.full = full;
-      const part = Math.max(0, Math.min(1, (q - (n === 0 ? 0.25 : 0)) / 0.75));   // email goes first, tagline overlaps after
+      const part = n === 0 ? Math.max(0, Math.min(1, (q - 0.25) / 0.75)) : Math.max(0, Math.min(1, q));   // email starts first; both finish exactly at the end
       const keep = Math.round(full.length * (1 - part));
       if (el.dataset.keep == keep) return; el.dataset.keep = keep;
       const caret = keep < full.length && keep > 0 ? '<span class="caret typing"></span>' : "";
@@ -543,11 +543,11 @@ let exitStyle = new URLSearchParams(location.search).get("exit") || "scatter";
 const ease = (x) => x < 0 ? 0 : x > 1 ? 1 : x * x * (3 - 2 * x);
 function exitPose(g, x, y, size, rot, p) {
   const W = innerWidth, H = innerHeight, cx = W / 2, cy = H / 2;
-  const t = ease((p - g.stagger) / 0.6);              // this gem's own progress, 0 → 1
+  const t = ease((p - g.stagger) / (1 - g.stagger));  // this gem's own progress, 0 → 1 (every gem finishes exactly at p = 1)
   if (t <= 0) return { x, y, size, rot, alpha: 1, flash: 0 };
   const dx = x - cx, dy = y - cy, dist = Math.hypot(dx, dy) || 1;
   if (exitStyle === "scatter") {
-    const go = t * t * t * Math.max(W, H) * 0.75;
+    const go = t * t * t * Math.min(W, H) * 0.32;   // short enough that they fade out on screen, not fly off it
     return { x: x + dx / dist * go, y: y + dy / dist * go - t * 40, size: size * (1 + t * 0.25), rot: rot + t * g.spin * 3, alpha: 1 - t * t * t, flash: Math.sin(t * Math.PI) * 0.6 };
   }
   if (exitStyle === "fall") {
@@ -583,7 +583,7 @@ function frame(ms) {
   // the light: your cursor; when it's away, a light slowly drifts around above the page
   const light = mouse || { x: innerWidth * (.5 + .42 * Math.cos(t * .23)), y: innerHeight * (.45 + .4 * Math.sin(t * .31)) };
   // scroll progress, timed to the title: at p = 0.9 every gem has left, which is exactly when the text is gone
-  const p = 0.9 * Math.pow(1 - gemsLeft, 1.7) + (scrollY > innerHeight ? 0.3 : 0);   // slow start, quicker finish
+  const p = Math.pow(1 - gemsLeft, 1.4) + (scrollY > innerHeight ? 0.3 : 0);   // slow start, quicker finish; 1 = the moment the text is gone
   gems.forEach((g) => {
     if (g.stagger == null) { g.stagger = Math.random() * 0.3; g.spin = (Math.random() - 0.5) * 2; }
     // gentle drift, and sliding softly out of the cursor's way
