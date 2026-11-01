@@ -14,7 +14,7 @@ const intro = {
   tagline: "applied math (data science) @ uc berkeley",
   // a short paragraph under the tagline (each item = one line)
   about: [
-    "teaching myself everything else from books and the internet.",
+    "& teaching myself everything else from books and the internet.",
     "i love finding the structure hiding in messy things and retelling the story it was trying to tell.",
   ],
   links: [

@@ -171,13 +171,13 @@
   }
   .lc { display: inline-block; }
   /* the short paragraph between the tagline and the email */
-  .about { margin: 18px auto 0; max-width: 560px; font-family: var(--display); font-size: 18px; line-height: 1.5; color: var(--soft);
+  .about { margin: 8px auto 0; max-width: 560px; font-family: var(--display); font-size: 18px; line-height: 1.35; color: var(--soft);
            font-variation-settings: "SOFT" 100, "opsz" 24; opacity: 0; transform: translateY(6px); transition: opacity 1s ease, transform 1s ease; }
   .about.shown { opacity: 1; transform: none; }
   .about span { display: block; text-wrap: balance; }   /* wrapped lines come out even, no lonely last word */
-  .about span + span { margin-top: 4px; }
+  .about span + span { margin-top: 2px; }
   body.email-below .email-line { margin-top: 16px; }
-  @media (max-width: 700px) { .about { font-size: 15px; max-width: 86vw; margin-top: 14px; } }
+  @media (max-width: 700px) { .about { font-size: 15px; max-width: 86vw; margin-top: 7px; } }
   /* the "scroll for more" prompt at the bottom of the first screen */
   .scroll-cue { position: absolute; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 4;
                 color: var(--muted); text-decoration: none; font-size: 11px; letter-spacing: .12em; white-space: nowrap;
@@ -228,7 +228,7 @@
 </div>
 
 <script>if (new URLSearchParams(location.search).has("tune")) document.body.classList.add("tune");</script>
-<script src="js/content.js?v=1793498462"></script>
+<script src="js/content.js?v=1793498759"></script>
 <script>window.GEM_SHEET = "images/gem-sheet.png";</script>
 <script src="js/gems.js?v=1793426087"></script>
 <script src="js/facets.js?v=1793426087"></script>
