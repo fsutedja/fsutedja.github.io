@@ -440,11 +440,11 @@ function typeTagline(text) {
   setTimeout(step, 700);   // start shortly after the page appears
 }
 /* the tagline is static, except the last word: it types, pauses, deletes itself and types the next one */
-const rot = { words: intro.taughtFrom || [], w: 0, i: 0, paused: false, timer: null };
-const currentTagline = () => intro.tagline + (rot.words[rot.w] || "").slice(0, rot.i) + ".";
+const rot = { words: (intro.taughtFrom || []).map((w) => w + "."), w: 0, i: 0, paused: false, timer: null };   // the full stop is typed with each word
+const currentTagline = () => intro.tagline + (rot.words[rot.w] || "").slice(0, rot.i);
 function drawTagline(typing) {
   const el = $("#tagline"), word = (rot.words[rot.w] || "").slice(0, rot.i);
-  el.innerHTML = esc2(intro.tagline) + `<span class="rot">${esc2(word)}</span><span class="caret${typing ? " typing" : ""}"></span>.`;
+  el.innerHTML = esc2(intro.tagline) + `<span class="rot">${esc2(word)}</span><span class="caret${typing ? " typing" : ""}"></span>`;
   delete el.dataset.full; delete el.dataset.keep;
 }
 function rotate() {
