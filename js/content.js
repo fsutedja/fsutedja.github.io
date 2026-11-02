@@ -10,7 +10,7 @@
 
 // ---------- The intro card ----------
 const intro = {
-  greeting: "<span class=\"hi\">Hi, I’m</span> <i>Freya</i>",   // <i>…</i> = italic
+  greeting: "<span class=\"hi-above mono\">hi, i’m</span><i>Freya</i> Sutedja",   // <i>…</i> = italic; "hi, i'm" sits small above the name
   // two lines that type themselves under your name ("\n" = new line)
   tagline: "applied math (data science) @ uc berkeley\n& everything else self-taught from ",
   // the word at the end of the tagline keeps typing and switching between these

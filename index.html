@@ -6,7 +6,7 @@
 <title>Freya Sutedja</title>
 <link rel="icon" type="image/png" href="images/favicon.png">
 <link rel="apple-touch-icon" href="images/apple-touch-icon.png">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,300..700,0..100,0..1;1,9..144,300..700,0..100,0..1&family=Young+Serif&family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,300..700&family=Rubik:wght@400;500&family=Caveat:wght@400;600&family=IBM+Plex+Mono&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,300..700,0..100,0..1;1,9..144,300..700,0..100,0..1&family=Young+Serif&family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,300..700&family=Rubik:wght@400;500&family=Caveat:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link href="https://api.fontshare.com/v2/css?f[]=chillax@400,500&display=swap" rel="stylesheet">
 <style>
   :root { --bg: #f1eeea; --paper: #f8f6f2; --ink: #3a3433; --soft: #6b615e; --muted: #9a908c; --rose: #b0707c; --line: #ddd5cc;
@@ -217,10 +217,16 @@
   .rv-shine .w.in { opacity: 1; color: var(--ink); }
   @media (max-width: 700px) { body.merged .about { font-size: 15.5px; } }
   /* the two typed lines: keep the line break, and let long lines wrap evenly on narrow screens */
-  .hello .tag { white-space: pre-line; text-wrap: balance; line-height: 1.7; }
+  .hello .tag { font-weight: 500; }   /* typed lines a touch bolder (medium) */
+  .hello .tag { white-space: pre-line; text-wrap: balance; line-height: 1.5; }
   @media (max-width: 700px) { .hello .tag { white-space: pre; } }   /* phones: each line stays one line (the font is sized so it fits) */
   /* "Hi, I'm" a little smaller than the name */
   #greeting .hi { font-size: .82em; }
+  /* "hi, i'm" sits small above the name, lined up with the start of Freya and tucked in close */
+  #greeting:has(.hi-above) { width: max-content; margin-left: auto; margin-right: auto; text-align: left; }
+  #greeting .hi-above { display: block; font-size: .36em; letter-spacing: 0; margin: 0 0 -.02em .3em; }
+  #greeting .hi-above.mono { font-family: "IBM Plex Mono", monospace; text-transform: none; font-size: 13px; font-weight: 500; font-variation-settings: normal;
+                              letter-spacing: .06em; color: var(--muted); margin: 0 0 -2px .55em; }
 </style>
 
 </head>
@@ -262,7 +268,7 @@
 </div>
 
 <script>if (new URLSearchParams(location.search).has("tune")) document.body.classList.add("tune");</script>
-<script src="js/content.js?v=1793500372"></script>
+<script src="js/content.js?v=1793600000"></script>
 <script>window.GEM_SHEET = "images/gem-sheet.png";</script>
 <script src="js/gems.js?v=1793426087"></script>
 <script src="js/facets.js?v=1793426087"></script>
