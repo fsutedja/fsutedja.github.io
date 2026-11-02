@@ -113,6 +113,7 @@
   @media (max-width: 700px) {
     html, body { overscroll-behavior: none; }
     header { padding: 16px 20px; font-size: 10px; }
+    header { background: linear-gradient(to bottom, var(--bg) 62%, rgba(241, 238, 234, 0)); padding-bottom: 26px; }   /* the projects scroll under the bar on phones: soft fade so they don't clash */
     header .where { display: none; }                       /* keep just the time */
     .hello { width: 92vw; transform: translate(-50%, -50%) scale(var(--fit, 1)); }   /* sized with the screen; also shrinks if the window is very short */
     .hello h1 { font-size: calc(clamp(46px, 15vw, 80px) * var(--ts, 1)); }
@@ -181,6 +182,13 @@
   .about span + span { margin-top: 2px; }
   body.email-below .email-line { margin-top: 6px; }
   .about:empty { display: none; }   /* no paragraph right now, so it takes no space */
+  /* email in the top-left corner instead of your name (chosen); then it's not repeated under the tagline */
+  body.email-top #who { text-transform: none; letter-spacing: .04em; pointer-events: auto; user-select: text; }
+  body.email-top header .links .plain { display: none !important; }
+  /* …and its old spot under the tagline becomes a "view my work ↓" link down to the projects */
+  body.email-top .email-line { display: block; margin-top: 8px; color: var(--muted); font-size: max(12px, calc(10.5px / var(--fit, 1))); letter-spacing: .04em;
+                               text-transform: none; cursor: pointer; width: max-content; margin-left: auto; margin-right: auto; transition: color .2s; }
+  body.email-top .email-line:hover { color: var(--rose); }
   @media (max-width: 700px) { .about { font-size: 15px; max-width: 86vw; margin-top: 7px; } }
   /* the "scroll for more" prompt at the bottom of the first screen */
   .scroll-cue { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 4;
@@ -218,7 +226,7 @@
 </head>
 <body>
 <div class="field" id="field"></div>
-<header class="mono" id="topbar"><span>freya sutedja</span><span class="right"><span class="where">berkeley, ca · </span><span id="clock"></span></span></header>
+<header class="mono" id="topbar"><span id="who">freya sutedja</span><span class="right"><span class="where">berkeley, ca · </span><span id="clock"></span></span></header>
 
 <main>
   <section class="screen" id="intro">
@@ -258,6 +266,8 @@
 <script>window.GEM_SHEET = "images/gem-sheet.png";</script>
 <script src="js/gems.js?v=1793426087"></script>
 <script src="js/facets.js?v=1793426087"></script>
+<script src="js/projects-drafts.js?v=15"></script>
+<script src="js/skills-drafts.js?v=2"></script>
 <script>
 const $ = s => document.querySelector(s);
 const linkList = links => links.map(l => !l.url ? `<span class="plain">${l.label}</span>` : l.url.startsWith("mailto:") ? `<a href="${l.url}">${l.label}</a>` : `<a href="${l.url}" target="_blank" rel="noopener">${l.label}</a>`).join("");
@@ -520,7 +530,14 @@ else if (aboutReveal === "stagger") {                                           
   });
 }
 { const plain = intro.links.find((l) => !l.url); if (plain) { $("#email-line").textContent = plain.label; $("#email-bottom").textContent = plain.label; } }
-{ const e = new URLSearchParams(location.search).get("email") || "below"; if (e === "below" || e === "bottom") document.body.classList.add("email-" + e); }   // "below" = chosen
+{ const e = new URLSearchParams(location.search).get("email") || "top"; if (e === "below" || e === "bottom" || e === "top") document.body.classList.add("email-" + e); }   // "top" = chosen (top-left corner); "below" = under the tagline
+if (document.body.classList.contains("email-top")) {
+  const plain = intro.links.find((l) => !l.url); if (plain) $("#who").textContent = plain.label;
+  // where the email used to be: "view my work ↓", which scrolls down to the projects
+  const work = $("#email-line"); work.textContent = "view my work ↓"; work.setAttribute("role", "link"); work.tabIndex = 0;
+  const go = () => { const t = $(".pj-d") || $("#next"); scrollTo({ top: t.getBoundingClientRect().top + scrollY, behavior: "smooth" }); };
+  work.addEventListener("click", go); work.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
+}
 
 // where the links go: under the tagline (default), or in the top bar
 let gemsLeft = 1, textBox = null, cueShown = false;
@@ -616,11 +633,15 @@ function build() {
     * (+new URLSearchParams(location.search).get("gs") || 0.9);   // gems at 90% (between the old size and 80%)
   // keep gems clear of the actual words (measured, so it works at any size)
   const box = $("#hello").getBoundingClientRect();
-  const quiet = { x: Math.max(box.width / 2 + 10, phone ? 0 : 380 * fit), y: Math.max(box.height / 2 + 26, phone ? 0 : 150 * fit) };
+  // the empty margin kept around the words (wider than the words themselves, so they have room to breathe)
+  const pad = phone ? { x: 18, y: 40 } : { x: 70 * fit, y: 75 * fit };
+  const quiet = { x: Math.max(box.width / 2 + pad.x, phone ? 0 : 380 * fit), y: Math.max(box.height / 2 + pad.y, phone ? 0 : 150 * fit) };
   field.innerHTML = ""; field.appendChild(canvas); renderer.resize(W, H);
   const cue = $("#scroll-cue").getBoundingClientRect();
   const offCue = (g) => !(g.x + g.r > cue.left - 14 && g.x - g.r < cue.right + 14 && g.y + g.r > cue.top - 14 && g.y - g.r < cue.bottom + 14);
-  gems = layoutGems(W, H, gemFit, sections, quiet).filter(offCue).map((g) => {
+  // if the project cards peek in at the bottom, the gems only spread over the space above them
+  const gemH = window.pjFirstScreen ? Math.min(H, window.pjFirstScreen() || H) : H;
+  gems = layoutGems(W, gemH, gemFit, sections, quiet).filter(offCue).map((g) => {
     const sp = sprites[g.name], size = sp.half * 2 * (g.r / sp.r);
     return { ...g, sp, size, tw: 0, phase: Math.random() * 6, ox: 0, oy: 0, amp: (3 + Math.random() * 5) * gemFit, speed: .25 + Math.random() * .35 };
   });
@@ -725,6 +746,7 @@ function frame(ms) {
   const light = mouse || { x: innerWidth * (.5 + .42 * Math.cos(t * .23)), y: innerHeight * (.45 + .4 * Math.sin(t * .31)) };
   // scroll progress, timed to the title: at p = 0.9 every gem has left, which is exactly when the text is gone
   const p = Math.pow(1 - gemsLeft, 1.4) + (scrollY > innerHeight ? 0.3 : 0);   // slow start, quicker finish; 1 = the moment the text is gone
+  const cards = window.pjAvoid ? window.pjAvoid() : null;   // the project cards' area, if they're on screen
   gems.forEach((g) => {
     if (g.stagger == null) { g.stagger = Math.random() * 0.3; g.spin = (Math.random() - 0.5) * 2; }
     // gentle drift, and sliding softly out of the cursor's way
@@ -752,6 +774,14 @@ function frame(ms) {
         if (g.side < 0 && e.y > textBox.t - rad) e.y -= (e.y - (textBox.t - rad)) * inX;
         if (g.side > 0 && e.y < textBox.b + rad) e.y += ((textBox.b + rad) - e.y) * inX;
       }
+    }
+    // keep gems off the project cards too, the same way they keep off the words: nothing fades,
+    // the gems just get nudged up out of the cards' way (softly, keeping their spacing so they don't pile into a row)
+    if (cards) {
+      const rad = g.r * (e.size / g.size) * 1.05 + 6;
+      const inX = Math.max(0, Math.min(1, (Math.min(e.x + rad - cards.l, cards.r - (e.x - rad))) / (rad * 1.5)));
+      const zone = 170, start = cards.t - zone, room = Math.max(1, zone - rad), u = e.y - start;
+      if (inX > 0 && u > 0) e.y -= (u - room * Math.tanh(u / room)) * inX;
     }
     if (e.alpha <= 0.01 || e.size < 0.5 || e.y > innerHeight + 200 || e.y < -200 || e.x < -200 || e.x > innerWidth + 200) return;
     items.push({ sprite: g.sp, x: e.x, y: e.y, size: e.size, rot: e.rot, light, near: Math.min(1.6, near + e.flash), alpha: e.alpha });
