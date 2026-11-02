@@ -1,14 +1,20 @@
 /*
   The projects section (the screen right after the intro).
-  Chosen: D (sideways strip) with "peek" (the cards show at the bottom of the first screen). That's what everyone sees.
+  Chosen: D (sideways strip) with "peek" (the cards show at the bottom of the first screen).
+  HIDDEN FOR NOW until there are real projects: add ?projects=d to the address to see it, or change "off" to "d" below to bring it back.
   The other drafts are still here to compare: ?projects=a, b or c · ?gap=none, soft or catch · ?projects=off hides the section.
   Later: the words move into content.js.
 */
 (() => {
-  const pick = (new URLSearchParams(location.search).get("projects") || "d").toLowerCase();
-  if (!["a", "b", "c", "d"].includes(pick)) return;
+  const pick = (new URLSearchParams(location.search).get("projects") || "off").toLowerCase();
   const host = document.getElementById("next");
   if (!host) return;
+  if (!["a", "b", "c", "d"].includes(pick)) {
+    // hidden: the empty screen collapses, and "view my work ↓" / "scroll for more" go too (nothing below to go to)
+    host.style.display = "none";
+    for (const id of ["email-line", "scroll-cue"]) { const el = document.getElementById(id); if (el) el.style.display = "none"; }
+    return;
+  }
 
   // placeholder projects (3–5 fit). media: path to a .gif / .png, or leave out for an empty frame
   const items = [
