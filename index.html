@@ -837,9 +837,10 @@ drawTuner();
 $("#tuner-toggle").onclick = () => tuner.classList.toggle("open");
 
 const fb = document.querySelectorAll("#fonts button");
-function setFont(f) { document.body.classList.remove("f-a", "f-b", "f-c", "f-d", "f-e"); document.body.classList.add(f); fb.forEach(b => b.classList.toggle("on", b.dataset.f === f)); history.replaceState(null, "", "#" + f); }
-fb.forEach(b => b.onclick = () => setFont(b.dataset.f));
-setFont(location.hash.slice(1) || "f-a");
+function setFont(f) { document.body.classList.remove("f-a", "f-b", "f-c", "f-d", "f-e"); document.body.classList.add(f); fb.forEach(b => b.classList.toggle("on", b.dataset.f === f)); }
+// only the font picker (?tune) writes the choice into the address, so normal visitors get a clean link
+fb.forEach(b => b.onclick = () => { setFont(b.dataset.f); history.replaceState(null, "", location.search + "#" + b.dataset.f); });
+setFont(/^f-[a-e]$/.test(location.hash.slice(1)) ? location.hash.slice(1) : "f-a");
 
 const tick = () => $("#clock").textContent = new Date().toLocaleTimeString("en-US", { timeZone: "America/Los_Angeles", hour: "numeric", minute: "2-digit" }).toLowerCase();
 tick(); setInterval(tick, 30000);
