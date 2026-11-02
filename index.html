@@ -148,6 +148,13 @@
     header .links { gap: 12px; position: static; transform: none; margin-left: auto; }   /* phones: links sit top-right */
     body.links-top header .right { display: none; }
   }
+  /* ?links=icons (chosen): logos in the top-left corner; the words version is hidden */
+  body.links-icons #links { display: none; }
+  #who .icon-links { display: flex; gap: 18px; align-items: center; pointer-events: auto; }
+  #who .icon-links a { color: var(--soft); display: inline-flex; transition: color .2s, transform .2s; }
+  #who .icon-links a:hover { color: var(--rose); transform: translateY(-1px); }
+  #who .icon-links svg { width: 17px; height: 17px; display: block; }
+  @media (max-width: 700px) { #who .icon-links { gap: 16px; } #who .icon-links svg { width: 16px; height: 16px; } }
   /* text in the links row that isn't a link (the written-out email) */
   .links .plain { color: var(--muted); text-transform: none; letter-spacing: .03em; }
   .email-line { display: none; }
@@ -224,6 +231,8 @@
   #greeting .hi { font-size: .82em; }
   /* "— hello, i'm —" sits small and centred above the name */
   #greeting .hi-dash { display: block; font: 500 12px "IBM Plex Mono", monospace; letter-spacing: .18em; color: var(--muted); margin-bottom: 14px; }
+  /* phones: "hello, i'm" uses the tagline's exact size (copied over in the script) and sits as far above the name as the tagline sits below */
+  @media (max-width: 700px) { #greeting .hi-dash { font-size: var(--tag-size, 11px); letter-spacing: .12em; margin-bottom: 12px; } }
   /* "hi, i'm" sits small above the name, lined up with the start of Freya and tucked in close */
   #greeting:has(.hi-above) { width: max-content; margin-left: auto; margin-right: auto; text-align: left; }
   #greeting .hi-above { display: block; font-size: .36em; letter-spacing: 0; margin: 0 0 -.02em .3em; }
@@ -465,6 +474,9 @@ function typeTagline(text) {
 const rot = { words: (intro.taughtFrom || []).map((w) => w + "."), w: 0, i: 0, paused: false, timer: null };   // the full stop is typed with each word
 // the longest line the tagline can ever show (with the longest word), so phones can size it to always fit on one line
 $("#tagline").style.setProperty("--tag-ch", Math.max(...(intro.tagline + rot.words.reduce((a, b) => (b.length > a.length ? b : a), "")).split("\n").map((l) => l.length)) + 1);
+// phones: hand the tagline's size to "hello, i'm" so the two match
+const syncHi = () => $("#greeting").style.setProperty("--tag-size", getComputedStyle($("#tagline")).fontSize);
+syncHi(); addEventListener("resize", syncHi);
 const currentTagline = () => intro.tagline + (rot.words[rot.w] || "").slice(0, rot.i);
 function drawTagline(typing) {
   const el = $("#tagline"), word = (rot.words[rot.w] || "").slice(0, rot.i);
@@ -582,13 +594,27 @@ addEventListener("scroll", () => requestAnimationFrame(fadeTitle), { passive: tr
 addEventListener("resize", fadeTitle);
 fadeTitle();
 
-const linksAt = new URLSearchParams(location.search).get("links") || "a";   // "a" = middle of the top bar (chosen)
+const linksAt = new URLSearchParams(location.search).get("links") || "icons";   // "icons" = logos in the top-left corner (chosen) · ?links=a = words in the middle of the bar
 if (linksAt === "a" || linksAt === "c") {
   const nav = $("#links"); document.body.classList.add("links-top");
   if (linksAt === "a") $("#topbar").insertBefore(nav, $("#topbar .right"));   // name · links · time
   else $("#topbar .right").prepend(nav);                                      // name ········ links · time
 }
 $("#links").innerHTML = linkList(intro.links);
+// logos in the top-left corner, in place of the written-out email: linkedin · github · email
+if (linksAt === "icons") {
+  document.body.classList.add("links-icons");
+  const ICON = {
+    linkedin: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>',
+    github: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>',
+    email: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>' };
+  // the email is only put together here (not written out in the page), so it's harder for spam bots to pick up
+  const plain = intro.links.find((l) => !l.url);
+  const mail = plain && plain.label.replace(/\s*\[at\]\s*/, "@").replace(/\s*\[dot\]\s*/g, ".");
+  const items = intro.links.filter((l) => l.url && ICON[l.label]).map((l) => ({ ...l, tip: l.label }));
+  if (mail) items.push({ label: "email", url: "mailto:" + mail, tip: mail });
+  $("#who").innerHTML = `<nav class="icon-links">${items.map((l) => `<a href="${l.url}" ${l.url.startsWith("mailto:") ? "" : 'target="_blank" rel="noopener"'} title="${l.tip}" aria-label="${l.tip}">${ICON[l.label]}</a>`).join("")}</nav>`;
+}
 
 const sections = [
   { name: "projects", gem: "oval", angle: -158, render: () => `<h2>projects</h2><div class="mono">${projects.length} so far</div>${projects.map(p => `<div class="item"><small class="mono">${p.status}</small><h3>${p.title}</h3><p>${p.what}</p>${p.links ? `<nav class="links mono">${linkList(p.links)}</nav>` : ""}</div>`).join("")}` },
